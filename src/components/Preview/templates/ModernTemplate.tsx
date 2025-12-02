@@ -1,0 +1,191 @@
+import { useResume } from '../../../context/ResumeContext';
+
+export const ModernTemplate = () => {
+    const { resume } = useResume();
+    const { personalInfo, summary, experience, education, skills, projects, certifications, layout } = resume;
+
+    // Default values if layout is missing or legacy
+    const defaultLayout = {
+        fontSize: 10,
+        lineHeight: 1.4,
+        sectionSpacing: 5,
+        margin: { top: 15, right: 15, bottom: 15, left: 15 }
+    };
+
+    const currentLayout = layout && typeof layout.fontSize === 'number'
+        ? layout
+        : defaultLayout;
+
+    const containerStyle = {
+        paddingTop: `${currentLayout.margin.top}mm`,
+        paddingRight: `${currentLayout.margin.right}mm`,
+        paddingBottom: `${currentLayout.margin.bottom}mm`,
+        paddingLeft: `${currentLayout.margin.left}mm`,
+        fontSize: `${currentLayout.fontSize}pt`,
+        lineHeight: currentLayout.lineHeight,
+    };
+
+    const sectionStyle = {
+        marginBottom: `${currentLayout.sectionSpacing}mm`,
+    };
+
+    return (
+        <div
+            className="bg-white text-gray-800 shadow-lg mx-auto min-h-[297mm]"
+            style={{
+                width: '210mm',
+                ...containerStyle
+            }}
+        >
+            {/* MODERN: Bold Name with thick accent line */}
+            <header style={sectionStyle} className="pb-4">
+                <h1 className="font-extrabold text-black mb-2 tracking-tight" style={{ fontSize: '2.5em', lineHeight: 1.2 }}>
+                    {personalInfo.fullName || 'Your Name'}
+                </h1>
+                <div className="h-1 w-16 bg-black mb-3"></div>
+                <div className="flex flex-wrap gap-x-2 text-black" style={{ fontSize: '0.9em' }}>
+                    {personalInfo.email && <span>{personalInfo.email}</span>}
+                    {personalInfo.phone && <span>| {personalInfo.phone}</span>}
+                    {personalInfo.location && <span>| {personalInfo.location}</span>}
+                    {personalInfo.linkedin && <span>| {personalInfo.linkedin}</span>}
+                    {personalInfo.website && <span>| {personalInfo.website}</span>}
+                    {personalInfo.github && <span>| {personalInfo.github}</span>}
+                </div>
+            </header>
+
+            {/* MODERN: Summary with left border accent */}
+            {summary && (
+                <section style={sectionStyle}>
+                    <div className="border-l-4 border-black pl-4 py-1">
+                        <p className="text-black">{summary}</p>
+                    </div>
+                </section>
+            )}
+
+            {/* MODERN: Experience with bold section headers */}
+            {experience.length > 0 && (
+                <section style={sectionStyle}>
+                    <h2 className="font-bold text-black mb-4 tracking-tight border-b border-gray-300 pb-1" style={{ fontSize: '1.2em' }}>EXPERIENCE</h2>
+                    <div className="space-y-4">
+                        {experience.map((exp, index) => (
+                            <div key={exp.id || index} className="pl-4 border-l-2 border-gray-300">
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <h3 className="font-bold text-black" style={{ fontSize: '1.1em' }}>{exp.position}</h3>
+                                    <span className="text-gray-600 whitespace-nowrap ml-2" style={{ fontSize: '0.9em' }}>
+                                        {exp.startDate} – {exp.current ? 'Present' : exp.endDate}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-baseline mb-2">
+                                    <span className="font-semibold text-black">{exp.company}</span>
+                                    {exp.location && <span className="text-gray-600" style={{ fontSize: '0.9em' }}>{exp.location}</span>}
+                                </div>
+                                <ul className="list-disc list-outside ml-5 space-y-1">
+                                    {exp.description.map((bullet, idx) => (
+                                        <li key={idx} className="text-black">
+                                            {bullet}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* MODERN: Education */}
+            {education.length > 0 && (
+                <section style={sectionStyle}>
+                    <h2 className="font-bold text-black mb-4 tracking-tight border-b border-gray-300 pb-1" style={{ fontSize: '1.2em' }}>EDUCATION</h2>
+                    <div className="space-y-3">
+                        {education.map((edu, index) => (
+                            <div key={edu.id || index}>
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <h3 className="font-bold text-black" style={{ fontSize: '1.1em' }}>{edu.institution}</h3>
+                                    <span className="text-gray-600 whitespace-nowrap" style={{ fontSize: '0.9em' }}>
+                                        {edu.startDate} – {edu.endDate}
+                                    </span>
+                                </div>
+                                <div className="text-black">
+                                    {edu.degree} in {edu.fieldOfStudy}
+                                    {edu.grade && <span className="text-gray-600"> • GPA: {edu.grade}</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* MODERN: Skills with comma separation */}
+            {skills.length > 0 && (
+                <section style={sectionStyle}>
+                    <h2 className="font-bold text-black mb-4 tracking-tight border-b border-gray-300 pb-1" style={{ fontSize: '1.2em' }}>SKILLS</h2>
+                    <div className="space-y-2">
+                        {skills.map((skillGroup, index) => (
+                            <div key={skillGroup.id || index}>
+                                <span className="font-bold text-black">{skillGroup.category}: </span>
+                                <span className="text-black">{skillGroup.items.join(' • ')}</span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* MODERN: Projects */}
+            {projects && projects.length > 0 && (
+                <section style={sectionStyle}>
+                    <h2 className="font-bold text-black mb-4 tracking-tight border-b border-gray-300 pb-1" style={{ fontSize: '1.2em' }}>PROJECTS</h2>
+                    <div className="space-y-3">
+                        {projects.map((project, index) => (
+                            <div key={project.id || index}>
+                                <h3 className="font-bold text-black mb-1" style={{ fontSize: '1.1em' }}>{project.name}</h3>
+                                <p className="text-black mb-1">{project.description}</p>
+                                {project.technologies && project.technologies.length > 0 && (
+                                    <p className="text-gray-600 mb-1" style={{ fontSize: '0.9em' }}>
+                                        {project.technologies.join(' • ')}
+                                    </p>
+                                )}
+                                {(project.link || project.github) && (
+                                    <div className="text-gray-600" style={{ fontSize: '0.9em' }}>
+                                        {project.link && <span>{project.link}</span>}
+                                        {project.link && project.github && <span> • </span>}
+                                        {project.github && <span>{project.github}</span>}
+                                    </div>
+                                )}
+                                {project.bullets && project.bullets.length > 0 && (
+                                    <ul className="list-disc list-outside ml-5 mt-1 space-y-0.5">
+                                        {project.bullets.map((bullet, idx) => (
+                                            <li key={idx} className="text-black">
+                                                {bullet}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* MODERN: Certifications */}
+            {certifications && certifications.length > 0 && (
+                <section style={sectionStyle}>
+                    <h2 className="font-bold text-black mb-4 tracking-tight border-b border-gray-300 pb-1" style={{ fontSize: '1.2em' }}>CERTIFICATIONS</h2>
+                    <div className="space-y-2">
+                        {certifications.map((cert, index) => (
+                            <div key={cert.id || index}>
+                                <div className="flex justify-between items-baseline">
+                                    <h3 className="font-bold text-black" style={{ fontSize: '1.1em' }}>{cert.name}</h3>
+                                    <span className="text-gray-600 whitespace-nowrap" style={{ fontSize: '0.9em' }}>{cert.date}</span>
+                                </div>
+                                <div className="text-black">
+                                    {cert.issuer}
+                                    {cert.link && <span className="text-gray-600 ml-2" style={{ fontSize: '0.9em' }}>• {cert.link}</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+        </div>
+    );
+};
