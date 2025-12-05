@@ -11,7 +11,7 @@ interface ResumePDFProps {
 export const ResumePDF = ({ resume }: ResumePDFProps) => {
     console.log('ResumePDF rendering with template:', resume.selectedTemplate);
 
-    const Template = () => {
+    const renderTemplate = () => {
         switch (resume.selectedTemplate) {
             case 'classic':
                 return <ClassicPDF resume={resume} />;
@@ -25,7 +25,7 @@ export const ResumePDF = ({ resume }: ResumePDFProps) => {
 
     return (
         <Document>
-            <Template />
+            {renderTemplate()}
         </Document>
     );
 };

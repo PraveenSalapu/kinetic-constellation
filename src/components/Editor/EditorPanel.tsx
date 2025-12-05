@@ -12,6 +12,7 @@ import { TailorModal } from './TailorModal';
 import { ATSScore } from './ATSScore';
 import { CoverLetterModal } from './CoverLetterModal';
 import { ProfileManager } from '../Profile/ProfileManager';
+import { UndoRedoButtons } from './UndoRedoButtons';
 import { Download, FileText, Users, Wand2, LayoutTemplate, XCircle } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
@@ -137,6 +138,8 @@ export const EditorPanel = () => {
                     )}
                 </div>
                 <div className="flex gap-2">
+                    <UndoRedoButtons />
+
                     <button
                         onClick={handleAutoAdjust}
                         className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all flex items-center gap-1"
@@ -176,11 +179,11 @@ export const EditorPanel = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="max-w-3xl mx-auto p-6 space-y-8 pb-20">
+                <div className="max-w-3xl mx-auto p-4 space-y-3 pb-12">
                     <PersonalInfo />
 
                     {showATSScore && (
-                        <div className="mb-6 relative">
+                        <div className="mb-3 relative">
                             <button
                                 onClick={() => setShowATSScore(false)}
                                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
@@ -202,7 +205,7 @@ export const EditorPanel = () => {
                             items={resume.sections.map(s => s.id)}
                             strategy={verticalListSortingStrategy}
                         >
-                            <div className="space-y-6">
+                            <div className="space-y-3">
                                 {resume.sections
                                     .filter((section) => section.isVisible)
                                     .map((section) => (

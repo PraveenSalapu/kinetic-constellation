@@ -26,6 +26,7 @@ export const initialResume: Resume = {
     projects: [],
     certifications: [],
     selectedTemplate: 'modern',
+    selectedFont: 'professional',
     layout: {
         fontSize: 10,
         lineHeight: 1.4,

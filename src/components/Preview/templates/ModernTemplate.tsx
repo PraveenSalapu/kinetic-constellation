@@ -16,6 +16,9 @@ export const ModernTemplate = () => {
         ? layout
         : defaultLayout;
 
+    const nameSize = currentLayout.nameSize || (currentLayout.fontSize + 14);
+    const contactSize = currentLayout.contactSize || (currentLayout.fontSize - 1);
+
     const containerStyle = {
         paddingTop: `${currentLayout.margin.top}mm`,
         paddingRight: `${currentLayout.margin.right}mm`,
@@ -38,12 +41,11 @@ export const ModernTemplate = () => {
             }}
         >
             {/* MODERN: Bold Name with thick accent line */}
-            <header style={sectionStyle} className="pb-4">
-                <h1 className="font-extrabold text-black mb-2 tracking-tight" style={{ fontSize: '2.5em', lineHeight: 1.2 }}>
+            <header style={sectionStyle} className="pb-4 border-b-2 border-black">
+                <h1 className="font-extrabold text-black mb-2 tracking-tight uppercase" style={{ fontSize: `${nameSize}pt`, lineHeight: 1.2, letterSpacing: '0.05em' }}>
                     {personalInfo.fullName || 'Your Name'}
                 </h1>
-                <div className="h-1 w-16 bg-black mb-3"></div>
-                <div className="flex flex-wrap gap-x-2 text-black" style={{ fontSize: '0.9em' }}>
+                <div className="flex flex-wrap gap-x-2.5 text-gray-700" style={{ fontSize: `${contactSize}pt` }}>
                     {personalInfo.email && <span>{personalInfo.email}</span>}
                     {personalInfo.phone && <span>| {personalInfo.phone}</span>}
                     {personalInfo.location && <span>| {personalInfo.location}</span>}

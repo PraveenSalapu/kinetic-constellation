@@ -1,5 +1,6 @@
 import { Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Resume } from '../../../types';
+import { renderPDFSection } from '../SectionRenderer';
 
 export const ModernPDF = ({ resume }: { resume: Resume }) => {
     console.log('ModernPDF rendering with layout:', resume.layout);
@@ -15,6 +16,11 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
         ? resume.layout
         : defaultLayout;
 
+    // Get sections in the user's custom order
+    const orderedSections = resume.sections
+        .filter(s => s.isVisible)
+        .sort((a, b) => a.order - b.order);
+
     // Convert mm to pt for margins (1mm = 2.835pt)
     const mmToPt = 2.835;
     const marginTop = (layout.margin?.top || 15) * mmToPt;
@@ -23,6 +29,9 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
     const marginLeft = (layout.margin?.left || 15) * mmToPt;
 
     // Dynamic styles based on layout
+    const nameSize = layout.nameSize || (layout.fontSize + 14);
+    const contactSize = layout.contactSize || (layout.fontSize - 1);
+
     const pageStyle = {
         paddingTop: marginTop,
         paddingRight: marginRight,
@@ -38,7 +47,7 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
         marginBottom: (layout.sectionSpacing || 5) * mmToPt,
         borderBottomWidth: 2,
         borderBottomColor: '#1e293b',
-        borderBottomStyle: 'solid',
+        borderBottomStyle: 'solid' as const,
         paddingBottom: 10,
     };
 
@@ -48,18 +57,18 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
 
     const styles = StyleSheet.create({
         name: {
-            fontSize: layout.fontSize + 14,
+            fontSize: nameSize,
             fontWeight: 'bold',
             color: '#0f172a',
             textTransform: 'uppercase',
             letterSpacing: 1,
-            marginBottom: 4,
+            marginBottom: 6,
         },
         contact: {
             flexDirection: 'row',
             flexWrap: 'wrap',
-            gap: 12,
-            fontSize: layout.fontSize - 1,
+            gap: 10,
+            fontSize: contactSize,
             color: '#475569',
         },
         sectionTitle: {
@@ -136,8 +145,10 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
         },
     });
 
+    const pageSize = resume.pageSize || 'A4';
+
     return (
-        <Page size="A4" style={pageStyle}>
+        <Page size={pageSize} style={pageStyle}>
             <View style={headerStyle}>
                 <Text style={styles.name}>{resume.personalInfo.fullName}</Text>
                 <View style={styles.contact}>
@@ -156,110 +167,7 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
                 </View>
             )}
 
-            {resume.experience.length > 0 && (
-                <View style={sectionStyle}>
-                    <Text style={styles.sectionTitle}>Experience</Text>
-                    {resume.experience.map((exp) => (
-                        <View key={exp.id} style={styles.experienceItem}>
-                            <View style={styles.row}>
-                                <Text style={styles.position}>{exp.position}</Text>
-                                <Text style={styles.date}>
-                                    {exp.startDate} - {exp.current ? 'Present' : exp.endDate}
-                                </Text>
-                            </View>
-                            <Text style={styles.company}>{exp.company} {exp.location ? `| ${exp.location}` : ''}</Text>
-                            {exp.description.map((bullet, i) => (
-                                <View key={i} style={styles.bullet}>
-                                    <Text style={styles.bulletPoint}>•</Text>
-                                    <Text style={styles.bulletText}>{bullet}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {resume.education.length > 0 && (
-                <View style={sectionStyle}>
-                    <Text style={styles.sectionTitle}>Education</Text>
-                    {resume.education.map((edu) => (
-                        <View key={edu.id} style={styles.experienceItem}>
-                            <View style={styles.row}>
-                                <Text style={styles.company}>{edu.institution}</Text>
-                                <Text style={styles.date}>
-                                    {edu.startDate} - {edu.endDate}
-                                </Text>
-                            </View>
-                            <Text style={{ fontSize: 10, color: '#334155' }}>
-                                {edu.degree} in {edu.fieldOfStudy}
-                                {edu.grade ? ` (GPA: ${edu.grade})` : ''}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {resume.skills.length > 0 && (
-                <View style={sectionStyle}>
-                    <Text style={styles.sectionTitle}>Skills</Text>
-                    <View>
-                        {resume.skills.map((skill) => (
-                            <View key={skill.id} style={styles.skillGroup}>
-                                <Text style={styles.skillCategory}>{skill.category}:</Text>
-                                <Text style={styles.skillList}>{skill.items.join(', ')}</Text>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {resume.projects && resume.projects.length > 0 && (
-                <View style={sectionStyle}>
-                    <Text style={styles.sectionTitle}>Projects</Text>
-                    {resume.projects.map((project) => (
-                        <View key={project.id} style={styles.experienceItem}>
-                            <Text style={styles.position}>{project.name}</Text>
-                            <Text style={{ fontSize: 10, color: '#334155', marginBottom: 2 }}>
-                                {project.description}
-                            </Text>
-                            {project.technologies && project.technologies.length > 0 && (
-                                <Text style={{ fontSize: 9, color: '#475569', marginBottom: 2 }}>
-                                    Technologies: {project.technologies.join(', ')}
-                                </Text>
-                            )}
-                            {(project.link || project.github) && (
-                                <Text style={{ fontSize: 9, color: '#475569' }}>
-                                    {project.link && `Link: ${project.link}`}
-                                    {project.link && project.github && ' | '}
-                                    {project.github && `GitHub: ${project.github}`}
-                                </Text>
-                            )}
-                            {project.bullets && project.bullets.length > 0 && project.bullets.map((bullet, i) => (
-                                <View key={i} style={styles.bullet}>
-                                    <Text style={styles.bulletPoint}>•</Text>
-                                    <Text style={styles.bulletText}>{bullet}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {resume.certifications && resume.certifications.length > 0 && (
-                <View style={sectionStyle}>
-                    <Text style={styles.sectionTitle}>Certifications</Text>
-                    {resume.certifications.map((cert) => (
-                        <View key={cert.id} style={styles.experienceItem}>
-                            <View style={styles.row}>
-                                <Text style={styles.position}>{cert.name}</Text>
-                                <Text style={styles.date}>{cert.date}</Text>
-                            </View>
-                            <Text style={styles.company}>{cert.issuer}</Text>
-                            {cert.link && <Text style={{ fontSize: 9, color: '#475569' }}>{cert.link}</Text>}
-                        </View>
-                    ))}
-                </View>
-            )}
+            {orderedSections.map((section) => renderPDFSection(section.id, resume, styles))}
         </Page>
     );
 };

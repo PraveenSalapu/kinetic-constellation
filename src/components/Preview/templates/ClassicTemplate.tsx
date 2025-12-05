@@ -6,14 +6,17 @@ export const ClassicTemplate = () => {
 
     const defaultLayout = {
         fontSize: 10,
-        lineHeight: 1.5,
-        sectionSpacing: 6,
-        margin: { top: 20, right: 20, bottom: 20, left: 20 }
+        lineHeight: 1.4,
+        sectionSpacing: 5,
+        margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const currentLayout = layout && typeof layout.fontSize === 'number'
         ? layout
         : defaultLayout;
+
+    const nameSize = currentLayout.nameSize || (currentLayout.fontSize + 10);
+    const contactSize = currentLayout.contactSize || (currentLayout.fontSize * 0.9);
 
     const containerStyle = {
         paddingTop: `${currentLayout.margin.top}mm`,
@@ -38,10 +41,10 @@ export const ClassicTemplate = () => {
         >
             {/* CLASSIC: Centered header with double underline */}
             <header className="text-center pb-4 border-b-2 border-black" style={sectionStyle}>
-                <h1 className="font-bold text-black mb-2 tracking-wide uppercase" style={{ fontSize: '2em', lineHeight: 1.2 }}>
+                <h1 className="font-bold text-black mb-2 tracking-wide uppercase" style={{ fontSize: `${nameSize}pt`, lineHeight: 1.2, letterSpacing: '0.05em' }}>
                     {personalInfo.fullName || 'Your Name'}
                 </h1>
-                <div className="flex flex-wrap justify-center gap-x-3 text-black" style={{ fontSize: '0.9em' }}>
+                <div className="flex flex-wrap justify-center gap-x-2 text-black" style={{ fontSize: `${contactSize}pt` }}>
                     {personalInfo.email && <span>{personalInfo.email}</span>}
                     {personalInfo.phone && <span>| {personalInfo.phone}</span>}
                     {personalInfo.location && <span>| {personalInfo.location}</span>}

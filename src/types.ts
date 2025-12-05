@@ -69,18 +69,20 @@ export interface Resume {
         link?: string;
     }[];
     selectedTemplate?: 'modern' | 'classic' | 'minimalist';
+    selectedFont?: 'professional' | 'modern' | 'technical';
+    pageSize?: 'A4' | 'LETTER';
     layout?: {
         fontSize: number; // pt
         lineHeight: number; // unitless multiplier
         sectionSpacing: number; // mm
+        nameSize?: number; // pt (font size for name header)
+        contactSize?: number; // pt (font size for contact info)
         margin: {
             top: number; // mm
             right: number; // mm
             bottom: number; // mm
             left: number; // mm
         };
-        // Keep legacy for migration/fallback if needed, or just remove
-        // We'll migrate on load if possible, or just default
     };
 }
 

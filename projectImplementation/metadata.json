@@ -1,5 +1,0 @@
-{
-  "name": "Resume Tailor",
-  "description": "A smart resume optimizer powered by Gemini 2.5. Analyze resumes against job descriptions, score matches, and polish bullet points for maximum impact.",
-  "requestFramePermissions": []
-}

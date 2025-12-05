@@ -6,14 +6,17 @@ export const MinimalistTemplate = () => {
 
     const defaultLayout = {
         fontSize: 10,
-        lineHeight: 1.8,
-        sectionSpacing: 10,
-        margin: { top: 25, right: 25, bottom: 25, left: 25 }
+        lineHeight: 1.4,
+        sectionSpacing: 5,
+        margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const currentLayout = layout && typeof layout.fontSize === 'number'
         ? layout
         : defaultLayout;
+
+    const nameSize = currentLayout.nameSize || (currentLayout.fontSize + 10);
+    const contactSize = currentLayout.contactSize || (currentLayout.fontSize - 1);
 
     const containerStyle = {
         paddingTop: `${currentLayout.margin.top}mm`,
@@ -37,18 +40,17 @@ export const MinimalistTemplate = () => {
             }}
         >
             {/* MINIMALIST: Simple name with subtle line */}
-            <header style={sectionStyle}>
-                <h1 className="font-light text-black mb-3 tracking-wide" style={{ fontSize: '2em', lineHeight: 1.2 }}>
+            <header style={sectionStyle} className="border-b border-black pb-3">
+                <h1 className="font-light text-black mb-2 tracking-wide" style={{ fontSize: `${nameSize}pt`, lineHeight: 1.2 }}>
                     {personalInfo.fullName || 'Your Name'}
                 </h1>
-                <div className="h-px bg-gray-300 w-full mb-4"></div>
-                <div className="flex flex-wrap gap-x-6 text-gray-700" style={{ fontSize: '0.9em' }}>
+                <div className="flex flex-wrap gap-x-6 text-gray-700" style={{ fontSize: `${contactSize}pt` }}>
                     {personalInfo.email && <span>{personalInfo.email}</span>}
                     {personalInfo.phone && <span>{personalInfo.phone}</span>}
                     {personalInfo.location && <span>{personalInfo.location}</span>}
                 </div>
                 {(personalInfo.linkedin || personalInfo.website || personalInfo.github) && (
-                    <div className="flex flex-wrap gap-x-6 text-gray-700 mt-1" style={{ fontSize: '0.9em' }}>
+                    <div className="flex flex-wrap gap-x-6 text-gray-700 mt-1" style={{ fontSize: `${contactSize}pt` }}>
                         {personalInfo.linkedin && <span>{personalInfo.linkedin}</span>}
                         {personalInfo.website && <span>{personalInfo.website}</span>}
                         {personalInfo.github && <span>{personalInfo.github}</span>}
