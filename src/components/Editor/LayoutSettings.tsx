@@ -12,11 +12,13 @@ export const LayoutSettings = () => {
         fontSize: 10,
         lineHeight: 1.4,
         sectionSpacing: 5,
+        nameSize: 20,
+        contactSize: 9,
         margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
-        ? resume.layout
+        ? { ...defaultLayout, ...resume.layout }
         : defaultLayout;
 
     useEffect(() => {
@@ -119,14 +121,14 @@ export const LayoutSettings = () => {
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
                                     <label className="text-sm text-gray-700">Name Size</label>
-                                    <span className="text-xs text-gray-500">{layout.nameSize || (layout.fontSize + 10)}pt</span>
+                                    <span className="text-xs text-gray-500">{layout.nameSize}pt</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="12"
                                     max="32"
                                     step="1"
-                                    value={layout.nameSize || (layout.fontSize + 10)}
+                                    value={layout.nameSize}
                                     onChange={(e) => updateLayout({ nameSize: parseFloat(e.target.value) })}
                                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />
@@ -135,14 +137,14 @@ export const LayoutSettings = () => {
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
                                     <label className="text-sm text-gray-700">Contact Info Size</label>
-                                    <span className="text-xs text-gray-500">{layout.contactSize || (layout.fontSize * 0.9)}pt</span>
+                                    <span className="text-xs text-gray-500">{layout.contactSize}pt</span>
                                 </div>
                                 <input
                                     type="range"
                                     min="7"
                                     max="12"
                                     step="0.5"
-                                    value={layout.contactSize || (layout.fontSize * 0.9)}
+                                    value={layout.contactSize}
                                     onChange={(e) => updateLayout({ contactSize: parseFloat(e.target.value) })}
                                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                 />

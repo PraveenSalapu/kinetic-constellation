@@ -10,7 +10,8 @@ export function useSection<T extends { id: string }>(sectionId: keyof Resume) {
     const { resume, dispatch } = useResume();
 
     // Get the section data with proper typing
-    const items = (resume[sectionId] as T[]) || [];
+    const sectionData = resume[sectionId];
+    const items = (Array.isArray(sectionData) ? sectionData as unknown as T[] : []);
 
     // Add new item to section
     const addItem = (item: Omit<T, 'id'>) => {

@@ -1,0 +1,226 @@
+{
+    "name": "Live Job Board - AI Powered",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "live-jobs",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "3a933db4-e9cb-4b21-a572-03e6d3ef1c52",
+            "name": "Webhook (POST)",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ],
+            "webhookId": "aa237266-1b38-4a86-9289-566c4aec8359",
+            "notes": "Must be POST to accept large resume data."
+        },
+        {
+            "parameters": {
+                "jsCode": "// 1. CONFIGURATION\nconst config = {\n  googleApiKey: \"AIzaSyCFEzC5hdOqAapiUaTVhaGOruUL2YKll7U\",\n  searchEngineId: \"c6faa37b2961e439e\",\n  geminiApiKey: \"AIzaSyCFEzC5hdOqAapiUaTVhaGOruUL2YKll7U\"\n};\n\n// 2. INPUTS (From POST Body)\nconst body = $input.first().json.body || {};\nlet resumeData = body.resume || \"No resume provided\";\nif (typeof resumeData === 'object') resumeData = JSON.stringify(resumeData);\n\nconst role = body.role || \"Software Engineer\";\nconst location = body.location || \"United States\";\n\n// 3. BROAD QUERY\nconst sites = \"(site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:smartrecruiters.com)\";\nconst query = `${sites} (${role}) \"${location}\" -intitle:archive -intitle:closed`;\n\n// 4. PARALLEL EXECUTION (3 Pages = 30 Jobs)\n// We return 3 items. n8n will run the next node 3 times automatically.\nreturn [\n  { json: { ...config, q: query, resume: resumeData, start: 1 } }\n // { json: { ...config, q: query, resume: resumeData, start: 11 } },\n  //{ json: { ...config, q: query, resume: resumeData, start: 21 } }\n];"
+            },
+            "id": "ae321b7f-8a39-4a22-bc0b-668df73b9ea5",
+            "name": "Setup 3 Pages",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                224,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://www.googleapis.com/customsearch/v1",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "value": "={{ $json.q }}"
+                        },
+                        {
+                            "name": "key",
+                            "value": "={{ $json.googleApiKey }}"
+                        },
+                        {
+                            "name": "cx",
+                            "value": "={{ $json.searchEngineId }}"
+                        },
+                        {
+                            "name": "start",
+                            "value": "={{ $json.start }}"
+                        },
+                        {
+                            "name": "dateRestrict",
+                            "value": "d1"
+                        },
+                        {
+                            "name": "num",
+                            "value": "10"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "b2308d75-abbd-4e54-8440-e7c407a9b175",
+            "name": "Search (x3)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                448,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// AGGREGATE RESULTS\n// The 'Search' node ran 3 times. We merge the results here.\nconst allBatches = $input.all();\nlet allJobs = [];\n\nfor (const batch of allBatches) {\n  if (batch.json.items && Array.isArray(batch.json.items)) {\n    allJobs.push(...batch.json.items);\n  }\n}\n\n// Get resume from the first item of the previous node's input history\nconst resume = $('Setup 3 Pages').first().json.resume;\n\n// Limit to 30 to be safe for Gemini's context window\nconst jobsToAnalyze = allJobs.slice(0, 30);\n\nconst prompt = `\nCompare this candidate to these ${jobsToAnalyze.length} job results.\n\nCANDIDATE: ${resume}\n\nJOBS: ${JSON.stringify(jobsToAnalyze)}\n\nTASK:\n1. Filter out invalid jobs (login pages, archives).\n2. Score valid jobs 0-100.\n3. Extract 'date_posted' (e.g. \"18 hours ago\", \"Dec 5\"). If missing, use \"Recently\".\n\nRETURN JSON ONLY:\n[\n  {\n    \"company\": \"Company\",\n    \"title\": \"Title\",\n    \"link\": \"URL\",\n    \"match_score\": 90,\n    \"date_posted\": \"2 hours ago\",\n    \"missing_skills\": [\"A\", \"B\"]\n  }\n]\n`;\n\nreturn [{\n  json: {\n    body: {\n      contents: [{ parts: [{ text: prompt }] }]\n    }\n  }\n}];"
+            },
+            "id": "87640f3f-5dea-405e-9c81-a3d8eb969e34",
+            "name": "Merge & Prep",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                672,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={{ $('Setup 3 Pages').first().json.geminiApiKey }}",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json.body }}",
+                "options": {}
+            },
+            "id": "3f92f88e-e5b1-4e78-8d27-a89a25b0aa76",
+            "name": "AI Scoring",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                880,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "try {\n  const raw = $input.first().json.candidates[0].content.parts[0].text;\n  const clean = raw.replace(/```json|```/g, '').trim();\n  const results = JSON.parse(clean);\n  return [{ json: { count: results.length, results } }];\n} catch (e) {\n  return [{ json: { error: \"AI failed\", raw: $input.first().json } }];\n}"
+            },
+            "id": "21501c5f-cc03-4cb8-beee-3e751b532561",
+            "name": "Format JSON",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1104,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Access-Control-Allow-Origin",
+                                "value": "*"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "ce264301-f60f-4ea7-b25d-5b9baef6aaa5",
+            "name": "Respond",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1328,
+                0
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Webhook (POST)": {
+            "main": [
+                [
+                    {
+                        "node": "Setup 3 Pages",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Setup 3 Pages": {
+            "main": [
+                [
+                    {
+                        "node": "Search (x3)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Search (x3)": {
+            "main": [
+                [
+                    {
+                        "node": "Merge & Prep",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Merge & Prep": {
+            "main": [
+                [
+                    {
+                        "node": "AI Scoring",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Scoring": {
+            "main": [
+                [
+                    {
+                        "node": "Format JSON",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format JSON": {
+            "main": [
+                [
+                    {
+                        "node": "Respond",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": true,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "versionId": "d8c0deb3-d676-4e7e-bca9-e39546cedfb3",
+    "meta": {
+        "instanceId": "ff68ba6a9d2b448fd8d106e5b331bbdcf6fb703eb9357f649a1d4d2a8f394666"
+    },
+    "id": "0XPUsTvdzAdzEt8r",
+    "tags": []
+}

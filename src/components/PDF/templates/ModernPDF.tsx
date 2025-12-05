@@ -9,11 +9,13 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
         fontSize: 10,
         lineHeight: 1.4,
         sectionSpacing: 5,
+        nameSize: 24,
+        contactSize: 9,
         margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
-        ? resume.layout
+        ? { ...defaultLayout, ...resume.layout }
         : defaultLayout;
 
     // Get sections in the user's custom order
@@ -29,8 +31,8 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
     const marginLeft = (layout.margin?.left || 15) * mmToPt;
 
     // Dynamic styles based on layout
-    const nameSize = layout.nameSize || (layout.fontSize + 14);
-    const contactSize = layout.contactSize || (layout.fontSize - 1);
+    const nameSize = layout.nameSize;
+    const contactSize = layout.contactSize;
 
     const pageStyle = {
         paddingTop: marginTop,

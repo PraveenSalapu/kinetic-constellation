@@ -8,15 +8,17 @@ export const MinimalistTemplate = () => {
         fontSize: 10,
         lineHeight: 1.4,
         sectionSpacing: 5,
+        nameSize: 20,
+        contactSize: 9,
         margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const currentLayout = layout && typeof layout.fontSize === 'number'
-        ? layout
+        ? { ...defaultLayout, ...layout }
         : defaultLayout;
 
-    const nameSize = currentLayout.nameSize || (currentLayout.fontSize + 10);
-    const contactSize = currentLayout.contactSize || (currentLayout.fontSize - 1);
+    const nameSize = currentLayout.nameSize;
+    const contactSize = currentLayout.contactSize;
 
     const containerStyle = {
         paddingTop: `${currentLayout.margin.top}mm`,

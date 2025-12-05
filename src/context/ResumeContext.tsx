@@ -60,17 +60,6 @@ const saveToHistory = (state: ResumeState): ResumeState => {
 };
 
 const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState => {
-    // Actions that should be tracked in history
-    const trackableActions = [
-        'UPDATE_PERSONAL_INFO',
-        'UPDATE_SUMMARY',
-        'ADD_ITEM',
-        'DELETE_ITEM',
-        'UPDATE_ITEM',
-        'REORDER_SECTIONS',
-        'APPLY_LAYOUT',
-    ];
-
     let newState: ResumeState;
 
     switch (action.type) {

@@ -9,11 +9,13 @@ export const ClassicPDF = ({ resume }: { resume: Resume }) => {
         fontSize: 10,
         lineHeight: 1.4,
         sectionSpacing: 5,
+        nameSize: 20,
+        contactSize: 9,
         margin: { top: 15, right: 15, bottom: 15, left: 15 }
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
-        ? resume.layout
+        ? { ...defaultLayout, ...resume.layout }
         : defaultLayout;
 
     // Get sections in the user's custom order
@@ -31,8 +33,8 @@ export const ClassicPDF = ({ resume }: { resume: Resume }) => {
     const baseFontSize = layout.fontSize;
     const lineHeight = layout.lineHeight;
     const sectionGap = (layout.sectionSpacing || 5) * mmToPt;
-    const nameSize = layout.nameSize || (baseFontSize + 10);
-    const contactSize = layout.contactSize || (baseFontSize * 0.9);
+    const nameSize = layout.nameSize;
+    const contactSize = layout.contactSize;
 
     const styles = StyleSheet.create({
         page: {
