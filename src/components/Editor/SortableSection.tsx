@@ -26,12 +26,13 @@ export const SortableSection = ({ id, children }: SortableSectionProps) => {
         position: 'relative' as const,
     };
 
+
     return (
         <div ref={setNodeRef} style={style} className="group relative">
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute left-2 top-6 p-2 text-slate-600 hover:text-slate-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                className="absolute left-2 top-6 p-2 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-20"
             >
                 <GripVertical size={20} />
             </div>

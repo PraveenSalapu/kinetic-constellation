@@ -2,21 +2,21 @@
 @import "tailwindcss";
 
 @theme {
-  /* Neo-Swiss Color System */
-  --color-background: #F8F9FA;
-  --color-surface: #FFFFFF;
-  --color-border: #E5E7EB;
-  --color-text: #1F2937;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
+  /* Forensic Dark Mode Color System */
+  --color-background: #050505;
+  --color-surface: #111111;
+  --color-border: #1F2937;
+  --color-text: #E5E7EB;
+  --color-text-secondary: #9CA3AF;
+  --color-text-muted: #6B7280;
 
-  /* Brand Colors - Professional Blue Palette */
-  --color-primary: #2563EB;
-  --color-primary-hover: #1D4ED8;
-  --color-primary-light: #DBEAFE;
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
+  /* Brand Colors - Mission Control Indigo */
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-primary-light: #312E81;
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -28,11 +28,11 @@
   --font-resume-modern: 'Inter', system-ui, sans-serif;
   --font-resume-technical: 'Consolas', 'Monaco', monospace;
 
-  /* Shadows - Subtle and Professional */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  /* Shadows - Dark Mode Optimized */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
@@ -72,7 +72,7 @@
   }
 
   .btn-secondary {
-    @apply px-4 py-2.5 bg-surface text-text border border-border font-medium rounded-lg transition-all duration-200 hover:bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+    @apply px-4 py-2.5 bg-[#1a1a1a] text-text border border-border font-medium rounded-lg transition-all duration-200 hover:bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
     box-shadow: var(--shadow-sm);
   }
 
@@ -85,7 +85,7 @@
   }
 
   .btn-icon {
-    @apply p-2 bg-surface border border-border rounded-lg transition-all duration-200 hover:bg-background hover:border-primary;
+    @apply p-2 bg-[#1a1a1a] border border-border rounded-lg text-text-secondary transition-all duration-200 hover:bg-surface hover:border-primary hover:text-primary;
   }
 
   /* Card Panels */
@@ -100,7 +100,7 @@
 
   /* Input Fields - Consistent Across All */
   .input-field {
-    @apply w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20;
+    @apply w-full px-4 py-2.5 bg-[#1a1a1a] border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary;
   }
 
   .input-field:hover:not(:focus) {
@@ -108,7 +108,7 @@
   }
 
   .textarea-field {
-    @apply w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[80px] resize-y;
+    @apply w-full px-4 py-2.5 bg-[#1a1a1a] border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-[80px] resize-y;
   }
 
   .textarea-field:hover:not(:focus) {
@@ -116,11 +116,11 @@
   }
 
   .label-field {
-    @apply block text-sm font-medium text-text mb-1.5;
+    @apply block text-sm font-medium text-text-secondary mb-1.5;
   }
 
   .label-optional {
-    @apply text-text-secondary font-normal;
+    @apply text-text-muted font-normal;
   }
 
   /* Section Header */
@@ -138,7 +138,7 @@
   }
 
   .badge-primary {
-    @apply bg-primary-light text-primary;
+    @apply bg-primary-light text-indigo-300;
   }
 
   .badge-success {

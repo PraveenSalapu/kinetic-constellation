@@ -56,96 +56,42 @@ export const optimizeBulletPoint = async (bullet: string): Promise<string[]> => 
     }
 };
 
+const cleanJsonOutput = (text: string): string => {
+    let cleaned = text.trim();
+    // Find the first '{' and last '}' to extract JSON object
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+
+    return cleaned;
+};
+
 export const tailorResume = async (currentResume: string, jobDescription: string): Promise<TailorResponse> => {
     if (!API_KEY) throw new Error('API Key not set');
 
     try {
-        const schema: Schema = {
-            type: Type.OBJECT,
-            properties: {
-                tailoredSummary: {
-                    type: Type.STRING,
-                    description: "A professional summary rewritten to align with the job description.",
-                },
-                missingHardSkills: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "List of top 5 hard skills found in the JD but missing in the resume.",
-                },
-                reasoning: {
-                    type: Type.STRING,
-                    description: "Brief explanation of why these changes were recommended.",
-                },
-                improvedExperience: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            experienceId: { type: Type.STRING },
-                            revisedBullets: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        original: { type: Type.STRING },
-                                        new: { type: Type.STRING },
-                                        reason: { type: Type.STRING }
-                                    },
-                                    required: ["original", "new", "reason"]
-                                },
-                                description: "Direct improvements to existing bullet points."
-                            },
-                            recommendedBullets: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        bullet: { type: Type.STRING },
-                                        reason: { type: Type.STRING }
-                                    },
-                                    required: ["bullet", "reason"]
-                                },
-                                description: "New bullet points to add that bridge the gap between experience and JD requirements."
-                            }
-                        },
-                        required: ["experienceId", "revisedBullets", "recommendedBullets"]
-                    },
-                    description: "Improvements for each experience entry.",
-                },
-                projectSuggestions: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            title: { type: Type.STRING },
-                            description: { type: Type.STRING },
-                            technologies: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            reason: { type: Type.STRING }
-                        },
-                        required: ["title", "description", "technologies", "reason"]
-                    },
-                    description: "2-3 suggested projects that would strengthen the candidate's profile for this specific job."
-                }
-            },
-            required: ["tailoredSummary", "missingHardSkills", "reasoning", "improvedExperience", "projectSuggestions"],
-        };
-
+        // Schema definition moved to prompt instruction since we can't use responseSchema with tools
         const prompt = `
       You are an expert ATS (Applicant Tracking System) optimizer and resume writer.
 
       RESUME:
       ${currentResume}
 
-      JOB DESCRIPTION:
+      JOB DESCRIPTION (Context/URL):
       ${jobDescription}
 
       Task:
-      1. Identify the top 5 missing hard skills in the resume based on the JD.
-      2. Rewrite the 'Summary' section to align with this job.
-      3. For EACH experience entry in the resume:
+      1. **Analyze the Job**: If the provided 'Job Description' above is a URL, a short summary, or incomplete, use the 'googleSearch' tool to find the FULL official job description text for this specific role and company.
+      2. **VERIFICATION STEP**: Explicitly verify the "Years of Experience" and "Tech Stack" requirements using Google Search. **If the Search Result conflicts with the provided text, TRUST THE SEARCH RESULT.** (e.g., if text says "5 years" but official JD says "2 years", use "2 years").
+      3. **Identify Gaps**: Identify the top 5 missing hard skills in the resume based on the *verified* JD.
+      4. **Rewrite Summary**: Rewrite the 'Summary' section to align with this job.
+      5. **Improve Experience**:
          a) REVISE existing bullets that are weak or vague. Map the 'original' text to the 'new' version. Explain the 'reason'.
          b) RECOMMEND new bullets that bridge the gap between the user's experience and the JD requirements. These should be realistic additions that show relevant experience. Explain the 'reason'.
-      4. Suggest 2-3 IMPRESSIVE projects the candidate could add to their portfolio to better match this job.
+      6. **Suggest Projects**: Suggest 2-3 IMPRESSIVE projects the candidate could add to their portfolio to better match this job.
          - These should be realistic but impactful (e.g., "Build a full-stack e-commerce app with Next.js" if the JD asks for Next.js).
          - List key technologies for each project.
 
@@ -153,15 +99,31 @@ export const tailorResume = async (currentResume: string, jobDescription: string
       - Use strong action verbs.
       - Quantify results where possible.
       - Return improvedExperience as an array with one entry per experience item. Use the experience item's 'id' field as experienceId.
+      
+      OUTPUT FORMAT:
+      Return ONLY a valid JSON object with the following structure (no markdown, no explanations outside JSON):
+      {
+        "tailoredSummary": "string",
+        "missingHardSkills": ["string"],
+        "reasoning": "string",
+        "improvedExperience": [
+          {
+            "experienceId": "string",
+            "revisedBullets": [{ "original": "string", "new": "string", "reason": "string" }],
+            "recommendedBullets": [{ "bullet": "string", "reason": "string" }]
+          }
+        ],
+        "projectSuggestions": [{ "title": "string", "description": "string", "technologies": ["string"], "reason": "string" }]
+      }
     `;
 
         const result = await genAI.models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: schema,
-                systemInstruction: "You are a professional career coach and ATS specialist.",
+                tools: [{ googleSearch: {} }],
+                // responseMimeType: "application/json", // Unsupported with tools
+                systemInstruction: "You are a professional career coach and ATS specialist. Always verify job details if a URL is provided. Output strictly valid JSON.",
             },
         });
 
@@ -171,7 +133,7 @@ export const tailorResume = async (currentResume: string, jobDescription: string
         // Parse and validate JSON
         let parsed: any;
         try {
-            parsed = JSON.parse(text);
+            parsed = JSON.parse(cleanJsonOutput(text));
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             console.error('Raw response:', text);
@@ -201,45 +163,35 @@ export const calculateATSScore = async (resume: any, jobDescription: string): Pr
     if (!API_KEY) return { score: 0, missingKeywords: [], criticalFeedback: 'API Key missing' };
 
     try {
-        const schema: Schema = {
-            type: Type.OBJECT,
-            properties: {
-                score: {
-                    type: Type.INTEGER,
-                    description: "A match score from 0 to 100.",
-                },
-                missingKeywords: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING },
-                    description: "Key terminology missing from the resume.",
-                },
-                criticalFeedback: {
-                    type: Type.STRING,
-                    description: "Constructive feedback on how to improve the match score.",
-                },
-            },
-            required: ["score", "missingKeywords", "criticalFeedback"],
-        };
-
         const prompt = `
       Compare the following Resume and Job Description.
       
       RESUME:
       ${JSON.stringify(resume)}
   
-      JOB DESCRIPTION:
+      JOB DESCRIPTION (Context/URL):
       ${jobDescription}
   
       Task:
-      Provide a compatibility score (0-100), identify missing keywords, and provide critical feedback.
+      1. **Verify Job**: If the 'Job Description' is a URL or incomplete, use 'googleSearch' to find the full text.
+      2. **Score**: Provide a compatibility score (0-100).
+      3. **Analyze**: Identify missing keywords and provide critical feedback.
+
+      OUTPUT FORMAT:
+      Return ONLY a valid JSON object with this structure:
+      {
+        "score": number,
+        "missingKeywords": ["string"],
+        "criticalFeedback": "string"
+      }
     `;
 
         const result = await genAI.models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
-                responseSchema: schema,
+                tools: [{ googleSearch: {} }],
+                // responseMimeType: "application/json", // Unsupported with tools
             },
         });
 
@@ -249,7 +201,7 @@ export const calculateATSScore = async (resume: any, jobDescription: string): Pr
         // Parse and validate JSON
         let parsed: any;
         try {
-            parsed = JSON.parse(text);
+            parsed = JSON.parse(cleanJsonOutput(text));
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             console.error('Raw response:', text);
@@ -310,20 +262,48 @@ export const generateCoverLetter = async (resume: any, jobDescription: string): 
 
     try {
         const prompt = `
-      Write a professional and persuasive cover letter based on the following resume and job description.
-      
-      Resume:
-      ${JSON.stringify(resume)}
-      
-      Job Description:
-      ${jobDescription}
-      
-      The tone should be enthusiastic but professional.
-    `;
+          Draft a research-backed cover letter for this candidate.
+
+          Candidate Resume: ${JSON.stringify(resume).slice(0, 5000)}
+          JD: ${jobDescription}
+
+          STRICT FORMAT REQUIREMENT:
+          Follow this structure exactly:
+
+          [Current Date]
+
+          [Candidate Name]
+          [Candidate Bio/Tagline (1 sentence)]
+
+          [Company Name]
+          [Location (if known, else omit)]
+
+          Subject: Application for [Job Title]
+
+          [Body Paragraph 1: Hook & Interest - Reference real news/blog if found]
+          [Body Paragraph 2: Experience Match - Bridge challenge to resume]
+          [Body Paragraph 3: Passion & Vision - Why You]
+
+          Regards,
+          [Candidate Name]
+
+          STRICT CONTENT GUIDELINES (for the Body):
+          1. **Research First**: Use the 'googleSearch' tool to find REAL recent news, engineering blog posts, or tech stack details about the company mentioned in the JD.
+          2. **Opener**: Start with a pattern interrupt. Reference the specific news/post you found. E.g., "I saw your recent post about moving to Kubernetes..."
+          3. **Bridge**: Connect their specific challenge to the candidate's past experience (Use specific numbers from the resume).
+          4. **Evidence**: Show, don't just tell. Reference specific projects or achievements from the resume.
+          5. **Why You**: Brief human element.
+          
+          The tone should be enthusiastic but professional. Output matches the Strict Format above.
+        `;
 
         const result = await genAI.models.generateContent({
             model: MODEL_NAME,
             contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                responseMimeType: "text/plain"
+            }
         });
 
         return result.text || "Failed to generate cover letter.";

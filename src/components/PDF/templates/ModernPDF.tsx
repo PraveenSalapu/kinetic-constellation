@@ -3,15 +3,15 @@ import type { Resume } from '../../../types';
 import { renderPDFSection } from '../SectionRenderer';
 
 export const ModernPDF = ({ resume }: { resume: Resume }) => {
-    console.log('ModernPDF rendering with layout:', resume.layout);
     // Default values if layout is missing or legacy
     const defaultLayout = {
         fontSize: 10,
         lineHeight: 1.4,
         sectionSpacing: 5,
         nameSize: 24,
-        contactSize: 9,
-        margin: { top: 15, right: 15, bottom: 15, left: 15 }
+        contactSize: 10,
+        margin: { top: 15, right: 15, bottom: 15, left: 15 },
+        fontFamily: 'Helvetica'
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
@@ -41,7 +41,7 @@ export const ModernPDF = ({ resume }: { resume: Resume }) => {
         paddingLeft: marginLeft,
         fontSize: layout.fontSize,
         lineHeight: layout.lineHeight,
-        fontFamily: 'Helvetica',
+        fontFamily: layout.fontFamily || 'Helvetica', // Dynamic Font
         color: '#333',
     };
 

@@ -3,7 +3,6 @@ import type { Resume } from '../../../types';
 import { renderPDFSection } from '../SectionRenderer';
 
 export const ClassicPDF = ({ resume }: { resume: Resume }) => {
-    console.log('ClassicPDF rendering with layout:', resume.layout);
     // Default values if layout is missing or legacy
     const defaultLayout = {
         fontSize: 10,
@@ -11,7 +10,8 @@ export const ClassicPDF = ({ resume }: { resume: Resume }) => {
         sectionSpacing: 5,
         nameSize: 20,
         contactSize: 9,
-        margin: { top: 15, right: 15, bottom: 15, left: 15 }
+        margin: { top: 15, right: 15, bottom: 15, left: 15 },
+        fontFamily: 'Times-Roman'
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
@@ -42,7 +42,7 @@ export const ClassicPDF = ({ resume }: { resume: Resume }) => {
             paddingRight: marginRight,
             paddingBottom: marginBottom,
             paddingLeft: marginLeft,
-            fontFamily: 'Times-Roman',
+            fontFamily: layout.fontFamily || 'Times-Roman', // Dynamic Font
             fontSize: baseFontSize,
             color: '#000',
             lineHeight: lineHeight,

@@ -12,6 +12,8 @@ export type SectionConfig = Section;
 export type SkillGroup = Resume['skills'][number];
 export type ExperienceItem = Resume['experience'][number];
 export type EducationItem = Resume['education'][number];
+export type ProjectItem = Resume['projects'][number];
+export type CertificationItem = Resume['certifications'][number];
 
 export interface Resume {
     id: string;
@@ -72,6 +74,7 @@ export interface Resume {
     selectedFont?: 'professional' | 'modern' | 'technical';
     pageSize?: 'A4' | 'LETTER';
     layout?: {
+        fontFamily?: string; // Font family name
         fontSize: number; // pt
         lineHeight: number; // unitless multiplier
         sectionSpacing: number; // mm

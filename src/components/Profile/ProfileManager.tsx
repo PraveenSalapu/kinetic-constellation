@@ -91,21 +91,23 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-gray-200">
+            <div className="bg-[#111] border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gradient-to-r from-gray-900 to-black text-white">
                     <div>
-                        <h2 className="text-2xl font-bold">Manage Profiles</h2>
-                        <p className="text-indigo-100 text-sm">Switch between different resume versions</p>
+                        <h2 className="text-2xl font-bold font-mono tracking-tight flex items-center gap-2">
+                            <span className="text-green-500">●</span> Manage Profiles
+                        </h2>
+                        <p className="text-gray-400 text-sm font-light">Switch between different resume versions</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
                         <X size={20} />
                     </button>
                 </div>
 
-                <div className="p-6 overflow-y-auto flex-1">
+                <div className="p-6 overflow-y-auto flex-1 bg-[#111]">
                     {error && (
-                        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 border border-red-200">
+                        <div className="mb-4 p-4 bg-red-900/20 text-red-400 rounded-lg flex items-center gap-2 border border-red-800">
                             <AlertCircle size={20} />
                             <span>{error}</span>
                         </div>
@@ -117,18 +119,18 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                 {profiles.map((profile) => (
                                     <div
                                         key={profile.id}
-                                        className={`p-4 rounded-xl border-2 transition-all ${profile.isActive
-                                            ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                                            : 'border-gray-100 hover:border-indigo-200 hover:bg-gray-50'
+                                        className={`p-4 rounded-xl border transition-all ${profile.isActive
+                                            ? 'border-green-500/50 bg-green-900/10 shadow-[0_0_15px_rgba(0,255,100,0.1)]'
+                                            : 'border-gray-800 bg-[#1a1a1a] hover:border-gray-600'
                                             }`}
                                     >
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${profile.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                <div className={`p-2 rounded-lg ${profile.isActive ? 'bg-green-900/20 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
                                                     <FileText size={24} />
                                                 </div>
                                                 <div>
-                                                    <h3 className={`font-bold ${profile.isActive ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                                    <h3 className={`font-bold font-mono ${profile.isActive ? 'text-green-400' : 'text-gray-300'}`}>
                                                         {profile.name}
                                                     </h3>
                                                     <p className="text-xs text-gray-500">
@@ -138,13 +140,13 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {profile.isActive ? (
-                                                    <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold flex items-center gap-1">
+                                                    <span className="px-3 py-1 bg-green-900/20 text-green-400 border border-green-500/30 rounded-full text-xs font-bold flex items-center gap-1 font-mono">
                                                         <Check size={12} /> Active
                                                     </span>
                                                 ) : (
                                                     <button
                                                         onClick={() => handleSetActive(profile.id)}
-                                                        className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                        className="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors border border-transparent hover:border-gray-700"
                                                     >
                                                         Switch
                                                     </button>
@@ -152,7 +154,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                                 <button
                                                     onClick={() => handleDelete(profile.id)}
                                                     disabled={profiles.length <= 1}
-                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30"
+                                                    className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-30"
                                                     title="Delete Profile"
                                                 >
                                                     <Trash2 size={18} />
@@ -166,32 +168,32 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                             {profiles.length < 4 && (
                                 <button
                                     onClick={() => setShowAddForm(true)}
-                                    className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 font-medium"
+                                    className="w-full py-4 border border-dashed border-gray-700 rounded-xl text-gray-500 hover:border-green-500/50 hover:text-green-400 hover:bg-green-900/10 transition-all flex items-center justify-center gap-2 font-medium font-mono"
                                 >
                                     <Plus size={20} />
-                                    Create New Profile
+                                    CREATE_NEW_PROFILE
                                 </button>
                             )}
                         </div>
                     ) : (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4">Create New Profile</h3>
+                            <h3 className="text-lg font-bold text-white mb-4 font-mono">:: Create New Profile</h3>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Profile Name</label>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Profile Name</label>
                                     <input
                                         type="text"
                                         value={newProfileName}
                                         onChange={(e) => setNewProfileName(e.target.value)}
                                         placeholder="e.g. Senior Frontend Dev, Product Manager"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-white placeholder-gray-600"
                                         autoFocus
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">
                                         Import from Resume (Optional)
                                     </label>
                                     <div className="relative">
@@ -199,9 +201,9 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                             value={resumeText}
                                             onChange={(e) => setResumeText(e.target.value)}
                                             placeholder="Paste your existing resume text here to auto-populate..."
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all min-h-[150px] text-sm"
+                                            className="w-full px-4 py-3 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all min-h-[150px] text-sm text-gray-300 placeholder-gray-600 font-mono"
                                         />
-                                        <div className="absolute bottom-3 right-3 text-xs text-gray-400 pointer-events-none">
+                                        <div className="absolute bottom-3 right-3 text-xs text-gray-600 pointer-events-none">
                                             {resumeText.length > 0 ? `${resumeText.length} chars` : 'Paste text'}
                                         </div>
                                     </div>
@@ -214,7 +216,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                 <div className="flex gap-3 pt-4">
                                     <button
                                         onClick={() => setShowAddForm(false)}
-                                        className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                                        className="flex-1 px-4 py-2 text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-colors"
                                         disabled={isParsing}
                                     >
                                         Cancel
@@ -222,7 +224,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                                     <button
                                         onClick={handleCreateProfile}
                                         disabled={isParsing || !newProfileName.trim()}
-                                        className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="flex-1 px-4 py-2 bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/30 hover:border-green-500 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(0,255,100,0.1)]"
                                     >
                                         {isParsing ? (
                                             <>
@@ -242,10 +244,10 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                     )}
                 </div>
 
-                <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-center">
+                <div className="p-4 border-t border-gray-800 bg-[#111] flex justify-center">
                     <button
                         onClick={handleReset}
-                        className="text-xs text-red-500 hover:text-red-700 hover:underline flex items-center gap-1"
+                        className="text-xs text-red-900/50 hover:text-red-400 hover:underline flex items-center gap-1 transition-colors"
                     >
                         <Trash2 size={12} />
                         Reset Application & Clear All Data

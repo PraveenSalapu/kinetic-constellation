@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
 import { PersonalInfo } from './sections/PersonalInfo';
 import { Summary } from './sections/Summary';
@@ -13,9 +13,11 @@ import { ATSScore } from './ATSScore';
 import { CoverLetterModal } from './CoverLetterModal';
 import { ProfileManager } from '../Profile/ProfileManager';
 import { UndoRedoButtons } from './UndoRedoButtons';
-import { Download, FileText, Users, Wand2, LayoutTemplate, XCircle } from 'lucide-react';
+import { Download, FileText, Users, Wand2, XCircle, Save } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
+import { getDatabase } from '../../services/database/mongodb';
+import { v4 as uuidv4 } from 'uuid';
 import {
     DndContext,
     closestCenter,
@@ -42,16 +44,39 @@ export const EditorPanel = () => {
     const [isProfileManagerOpen, setIsProfileManagerOpen] = useState(false);
     const [showATSScore, setShowATSScore] = useState(false);
 
-    const handleAutoAdjust = () => {
-        dispatch({
-            type: 'APPLY_LAYOUT',
-            payload: {
-                fontSize: 9,
-                lineHeight: 1.2,
-                sectionSpacing: 3,
-                margin: { top: 10, right: 10, bottom: 10, left: 10 }
-            }
-        });
+    useEffect(() => {
+        if (resume.isTailoring && resume.tailoringJob) {
+            setIsTailorModalOpen(true);
+        }
+    }, [resume.isTailoring, resume.tailoringJob]);
+
+    const handleSaveApplication = async () => {
+        if (!resume.tailoringJob) return;
+
+        try {
+            const db = getDatabase();
+            await db.initialize();
+
+            await db.createApplication({
+                id: uuidv4(),
+                userId: 'user123',
+                company: resume.tailoringJob.company,
+                jobTitle: resume.tailoringJob.title,
+                jobUrl: resume.tailoringJob.link,
+                location: 'United States',
+                status: 'applied',
+                appliedDate: new Date(),
+                source: 'Kinetic Job Board',
+                timeline: [{ status: 'applied', date: new Date() }],
+                tags: ['Tailored'],
+                notes: `Tailored Resume Version based on AI optimization.`,
+                lastUpdated: new Date()
+            });
+            alert('Application saved to tracker!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save to tracker');
+        }
     };
 
     const handleStartTailoring = () => {
@@ -109,51 +134,63 @@ export const EditorPanel = () => {
             const oldIndex = resume.sections.findIndex((section) => section.id === active.id);
             const newIndex = resume.sections.findIndex((section) => section.id === over.id);
 
-            const newSections = arrayMove(resume.sections, oldIndex, newIndex);
+            const newSections = arrayMove(resume.sections, oldIndex, newIndex).map((section, index) => ({
+                ...section,
+                order: index
+            }));
+            
             dispatch({ type: 'REORDER_SECTIONS', payload: newSections });
         }
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200">
-            <div className="p-4 border-b border-gray-200 bg-white flex justify-between items-center shadow-sm z-10">
+        <div className="h-full flex flex-col bg-[#111] border-r border-gray-800 text-gray-200">
+            <div className="p-4 border-b border-gray-800 bg-[#111] flex justify-between items-center shadow-sm z-10">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                    <h2 className="text-xl font-bold text-white tracking-tight">
                         Editor
                     </h2>
                     <button
-                        onClick={() => setIsProfileManagerOpen(true)}
-                        className="ml-4 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full hover:bg-indigo-100 transition-colors flex items-center gap-1 border border-indigo-200"
+                        onClick={() => {
+                            console.log("Opening Profile Manager...");
+                            setIsProfileManagerOpen(true);
+                        }}
+                        className="ml-4 px-3 py-1.5 text-xs font-medium bg-indigo-900/30 text-indigo-300 rounded-full hover:bg-indigo-900/50 transition-colors flex items-center gap-1 border border-indigo-800"
                     >
                         <Users size={14} />
                         Profiles
                     </button>
                     {resume.isTailoring && (
-                        <div className="ml-4 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full border border-yellow-200 flex items-center gap-1">
-                            <span>Tailoring Mode</span>
-                            <button onClick={handleDiscardTailoring} className="ml-1 hover:text-red-600" title="Discard Changes">
-                                <XCircle size={14} />
-                            </button>
+                        <div className="flex items-center gap-2 ml-4">
+                            <div className="px-3 py-1 bg-yellow-900/30 text-yellow-500 text-xs font-medium rounded-full border border-yellow-800 flex items-center gap-1">
+                                <span>Tailoring Mode</span>
+                                <button onClick={handleDiscardTailoring} className="ml-1 hover:text-red-400" title="Discard Changes">
+                                    <XCircle size={14} />
+                                </button>
+                            </div>
+                            {resume.tailoringJob && (
+                                <button
+                                    onClick={handleSaveApplication}
+                                    className="px-3 py-1 bg-green-900/30 text-green-400 text-xs font-medium rounded-full border border-green-800 flex items-center gap-1 hover:bg-green-900/50 transition-colors"
+                                    title="Save Application to Tracker"
+                                >
+                                    <Save size={14} />
+                                    Save App
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
                 <div className="flex gap-2">
                     <UndoRedoButtons />
 
-                    <button
-                        onClick={handleAutoAdjust}
-                        className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all flex items-center gap-1"
-                        title="Auto-Adjust Layout (Single Page)"
-                    >
-                        <LayoutTemplate size={20} />
-                        <span className="text-sm font-medium hidden md:inline">Auto-Adjust</span>
-                    </button>
+
 
                     <LayoutSettings />
 
                     <button
                         onClick={handleStartTailoring}
-                        className={`p-2 rounded-lg transition-all flex items-center gap-1 ${resume.isTailoring ? 'text-indigo-600 bg-indigo-50' : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        className={`p-2 rounded-lg transition-all flex items-center gap-1 ${resume.isTailoring ? 'text-indigo-400 bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-400 hover:bg-indigo-900/20'}`}
                         title="Tailor Resume"
                     >
                         <Wand2 size={20} />
@@ -161,7 +198,7 @@ export const EditorPanel = () => {
                     </button>
                     <button
                         onClick={() => setIsCoverLetterModalOpen(true)}
-                        className="p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-indigo-400 hover:bg-indigo-900/20 rounded-lg transition-all"
                         title="Generate Cover Letter"
                     >
                         <FileText size={20} />
@@ -170,7 +207,7 @@ export const EditorPanel = () => {
                     <button
                         onClick={handleDownload}
                         disabled={isGeneratingPDF}
-                        className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all shadow-sm hover:shadow-md font-medium text-sm ${isGeneratingPDF ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all shadow-sm hover:shadow-md font-medium text-sm ${isGeneratingPDF ? 'bg-indigo-800 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'}`}
                     >
                         <Download size={16} />
                         {isGeneratingPDF ? 'Generating...' : 'Download PDF'}
@@ -178,7 +215,7 @@ export const EditorPanel = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#111]">
                 <div className="max-w-3xl mx-auto p-4 space-y-3 pb-12">
                     <PersonalInfo />
 

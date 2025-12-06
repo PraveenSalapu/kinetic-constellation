@@ -14,21 +14,21 @@ export const PersonalInfo = () => {
     return (
         <CollapsibleSection
             title="Personal Information"
-            icon={<User className="text-primary" size={18} />}
+            icon={<User className="text-indigo-400" size={18} />}
             defaultOpen={true}
         >
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-4 bg-[#111]">
                 {/* Full Name */}
                 <div>
-                    <label className="label-field">
-                        Full Name <span className="text-error">*</span>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                        Full Name <span className="text-red-400">*</span>
                     </label>
                     <input
                         type="text"
                         name="fullName"
                         value={personalInfo.fullName}
                         onChange={handleChange}
-                        className="input-field"
+                        className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                         placeholder="John Doe"
                         required
                     />
@@ -37,31 +37,31 @@ export const PersonalInfo = () => {
                 {/* Email & Phone */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="label-field">
-                            <Mail size={14} className="inline mr-1" />
-                            Email Address <span className="text-error">*</span>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                            <Mail size={12} className="inline mr-1" />
+                            Email Address <span className="text-red-400">*</span>
                         </label>
                         <input
                             type="email"
                             name="email"
                             value={personalInfo.email}
                             onChange={handleChange}
-                            className="input-field"
+                            className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                             placeholder="john@example.com"
                             required
                         />
                     </div>
                     <div>
-                        <label className="label-field">
-                            <Phone size={14} className="inline mr-1" />
-                            Phone Number <span className="text-error">*</span>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                            <Phone size={12} className="inline mr-1" />
+                            Phone Number <span className="text-red-400">*</span>
                         </label>
                         <input
                             type="tel"
                             name="phone"
                             value={personalInfo.phone}
                             onChange={handleChange}
-                            className="input-field"
+                            className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                             placeholder="+1 (555) 123-4567"
                             required
                         />
@@ -70,32 +70,32 @@ export const PersonalInfo = () => {
 
                 {/* Location */}
                 <div>
-                    <label className="label-field">
-                        <MapPin size={14} className="inline mr-1" />
-                        Location <span className="text-error">*</span>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                        <MapPin size={12} className="inline mr-1" />
+                        Location <span className="text-red-400">*</span>
                     </label>
                     <input
                         type="text"
                         name="location"
                         value={personalInfo.location}
                         onChange={handleChange}
-                        className="input-field"
+                        className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                         placeholder="San Francisco, CA"
                         required
                     />
                 </div>
 
-                <div className="border-t border-border my-3"></div>
+                <div className="border-t border-gray-800 my-3"></div>
 
                 {/* Professional Links */}
                 <div>
-                    <h3 className="text-sm font-semibold text-text mb-3">
-                        Professional Links <span className="label-optional">(Optional)</span>
+                    <h3 className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wider">
+                        Professional Links <span className="text-gray-500 font-normal ml-1">(Optional)</span>
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="label-field">
-                                <Linkedin size={14} className="inline mr-1 text-primary" />
+                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                <Linkedin size={12} className="inline mr-1 text-indigo-400" />
                                 LinkedIn
                             </label>
                             <input
@@ -103,13 +103,13 @@ export const PersonalInfo = () => {
                                 name="linkedin"
                                 value={personalInfo.linkedin || ''}
                                 onChange={handleChange}
-                                className="input-field"
+                                className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                 placeholder="linkedin.com/in/johndoe"
                             />
                         </div>
                         <div>
-                            <label className="label-field">
-                                <Github size={14} className="inline mr-1" />
+                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                <Github size={12} className="inline mr-1" />
                                 GitHub
                             </label>
                             <input
@@ -117,13 +117,13 @@ export const PersonalInfo = () => {
                                 name="github"
                                 value={personalInfo.github || ''}
                                 onChange={handleChange}
-                                className="input-field"
+                                className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                 placeholder="github.com/johndoe"
                             />
                         </div>
                         <div className="md:col-span-2">
-                            <label className="label-field">
-                                <Globe size={14} className="inline mr-1" />
+                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                <Globe size={12} className="inline mr-1" />
                                 Portfolio / Website
                             </label>
                             <input
@@ -131,7 +131,7 @@ export const PersonalInfo = () => {
                                 name="website"
                                 value={personalInfo.website || ''}
                                 onChange={handleChange}
-                                className="input-field"
+                                className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                 placeholder="www.johndoe.com"
                             />
                         </div>

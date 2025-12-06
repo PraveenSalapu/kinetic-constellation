@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ResumeProvider } from './context/ResumeContext';
 import { Layout } from './components/Layout';
-import { OnboardingFlow } from './components/Onboarding/OnboardingFlow';
+// import { OnboardingFlow } from './components/Onboarding/OnboardingFlow'; // Replaced by Roaster
+import { HeroRoaster } from './components/Landing/HeroRoaster';
 
 function App() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
@@ -9,7 +10,7 @@ function App() {
   return (
     <ResumeProvider>
       {!onboardingComplete ? (
-        <OnboardingFlow onComplete={() => setOnboardingComplete(true)} />
+        <HeroRoaster onComplete={() => setOnboardingComplete(true)} />
       ) : (
         <Layout />
       )}

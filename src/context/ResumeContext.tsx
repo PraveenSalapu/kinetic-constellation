@@ -5,6 +5,12 @@ import { initialResume } from '../data/initialState';
 type ResumeState = Resume & {
     selectedTemplate?: 'modern' | 'classic' | 'minimalist';
     isTailoring?: boolean;
+    tailoringJob?: {
+        title: string;
+        company: string;
+        description: string;
+        link?: string;
+    };
     originalResume?: Resume | null;
     history?: ResumeState[];
     historyIndex?: number;
@@ -22,7 +28,7 @@ type ResumeAction =
     | { type: 'SET_TEMPLATE'; payload: 'modern' | 'classic' | 'minimalist' }
     | { type: 'SET_FONT'; payload: 'professional' | 'modern' | 'technical' }
     | { type: 'SET_PAGE_SIZE'; payload: 'A4' | 'LETTER' }
-    | { type: 'START_TAILORING' }
+    | { type: 'START_TAILORING'; payload?: { job?: { title: string; company: string; description: string; link?: string } } }
     | { type: 'DISCARD_TAILORING' }
     | { type: 'APPLY_LAYOUT'; payload: Resume['layout'] }
     | { type: 'UNDO' }
@@ -122,6 +128,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             return {
                 ...state,
                 isTailoring: true,
+                tailoringJob: action.payload?.job,
                 originalResume: JSON.parse(JSON.stringify(state))
             };
 
@@ -130,6 +137,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             return {
                 ...state.originalResume,
                 isTailoring: false,
+                tailoringJob: undefined,
                 originalResume: null
             } as ResumeState;
 
@@ -188,8 +196,6 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
             // Migration: Ensure selectedTemplate exists
             const migratedTemplate = (profileData as any).selectedTemplate || 'modern';
 
-            console.log('Loading profile with layout:', migratedLayout);
-
             return {
                 ...profileData,
                 selectedTemplate: migratedTemplate,
@@ -203,18 +209,21 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
 
     // Save changes to the active profile whenever resume state changes
     // BUT ONLY if we are NOT in tailoring mode
+    // Debounced to prevent excessive writes
     useEffect(() => {
         if (resume.isTailoring) {
-            console.log('Skipping save - in tailoring mode');
             return;
         }
 
-        try {
-            console.log('Saving resume to storage with layout:', resume.layout);
-            updateActiveProfileData(resume);
-        } catch (error) {
-            console.error('Failed to save resume to storage:', error);
-        }
+        const handler = setTimeout(() => {
+            try {
+                updateActiveProfileData(resume);
+            } catch (error) {
+                console.error('Failed to save resume to storage:', error);
+            }
+        }, 1000);
+
+        return () => clearTimeout(handler);
     }, [resume]);
 
     // Undo/Redo helpers

@@ -1,51 +1,57 @@
+import { useState, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
 import { ModernTemplate } from './templates/ModernTemplate';
 import { ClassicTemplate } from './templates/ClassicTemplate';
 import { MinimalistTemplate } from './templates/MinimalistTemplate';
-import { Layout, Type, Minus, FileText } from 'lucide-react';
+import { Layout, Type } from 'lucide-react';
 
 export const PreviewPanel = () => {
     const { resume, dispatch } = useResume();
-    const { selectedTemplate, selectedFont, pageSize } = resume;
+    const { selectedTemplate, pageSize } = resume;
+    const [debouncedResume, setDebouncedResume] = useState(resume);
+
+    // Debounce the resume update to prevent flickering/lag on every keystroke
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedResume(resume);
+        }, 500); // 500ms delay
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [resume]);
 
     const templates = [
         { id: 'modern', name: 'Modern', icon: Layout },
         { id: 'classic', name: 'Classic', icon: Type },
-        { id: 'minimalist', name: 'Minimalist', icon: Minus },
-    ] as const;
-
-    const fonts = [
-        { id: 'professional', name: 'Professional', family: 'Times New Roman' },
-        { id: 'modern', name: 'Modern', family: 'Inter' },
-        { id: 'technical', name: 'Technical', family: 'Consolas' },
-    ] as const;
-
-    const pageSizes = [
-        { id: 'A4', name: 'A4', desc: '210×297mm' },
-        { id: 'LETTER', name: 'Letter', desc: '8.5×11"' },
     ] as const;
 
     const renderTemplate = () => {
         switch (selectedTemplate) {
             case 'classic':
-                return <ClassicTemplate />;
+                return <ClassicTemplate resume={debouncedResume} />;
             case 'minimalist':
-                return <MinimalistTemplate />;
+                // Minimalist is currently broken, fallback to Modern for now or implement if fixed
+                return <MinimalistTemplate resume={debouncedResume} />;
             case 'modern':
             default:
-                return <ModernTemplate />;
+                return <ModernTemplate resume={debouncedResume} />;
         }
     };
 
+    // Calculate width based on page size
+    const pageWidth = pageSize === 'LETTER' ? '216mm' : '210mm';
+    const pageHeight = pageSize === 'LETTER' ? '279mm' : '297mm';
+
     return (
-        <div className="h-full flex flex-col bg-background border-l border-border">
-            {/* Template & Font Selector Toolbar */}
-            <div className="p-4 border-b border-border bg-surface shadow-sm">
+        <div className="h-full flex flex-col bg-[#1e1e1e] border-l border-gray-800">
+            {/* Template Selector Toolbar */}
+            <div className="p-4 border-b border-gray-800 bg-[#111] shadow-sm z-10">
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4">
                     {/* Template Selector */}
                     <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-text-secondary">Template:</span>
-                        <div className="flex bg-background border border-border rounded-lg p-1">
+                        <span className="text-sm font-medium text-gray-400">Template:</span>
+                        <div className="flex bg-[#1a1a1a] border border-gray-700 rounded-lg p-1">
                             {templates.map((t) => {
                                 const Icon = t.icon;
                                 const isActive = selectedTemplate === t.id;
@@ -53,63 +59,13 @@ export const PreviewPanel = () => {
                                     <button
                                         key={t.id}
                                         onClick={() => dispatch({ type: 'SET_TEMPLATE', payload: t.id })}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                                            isActive
-                                                ? 'bg-primary text-white shadow-sm'
-                                                : 'text-text-secondary hover:text-text hover:bg-surface'
-                                        }`}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${isActive
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                                            }`}
                                     >
                                         <Icon size={14} />
                                         {t.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Font Selector */}
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-text-secondary">Font:</span>
-                        <div className="flex bg-background border border-border rounded-lg p-1">
-                            {fonts.map((f) => {
-                                const isActive = (selectedFont || 'professional') === f.id;
-                                return (
-                                    <button
-                                        key={f.id}
-                                        onClick={() => dispatch({ type: 'SET_FONT', payload: f.id })}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                                            isActive
-                                                ? 'bg-primary text-white shadow-sm'
-                                                : 'text-text-secondary hover:text-text hover:bg-surface'
-                                        }`}
-                                        style={{ fontFamily: f.family }}
-                                    >
-                                        <FileText size={14} />
-                                        {f.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Page Size Selector */}
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-text-secondary">Size:</span>
-                        <div className="flex bg-background border border-border rounded-lg p-1">
-                            {pageSizes.map((ps) => {
-                                const isActive = (pageSize || 'A4') === ps.id;
-                                return (
-                                    <button
-                                        key={ps.id}
-                                        onClick={() => dispatch({ type: 'SET_PAGE_SIZE', payload: ps.id })}
-                                        className={`flex flex-col items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                                            isActive
-                                                ? 'bg-primary text-white shadow-sm'
-                                                : 'text-text-secondary hover:text-text hover:bg-surface'
-                                        }`}
-                                    >
-                                        <span>{ps.name}</span>
-                                        <span className="text-xs opacity-75">{ps.desc}</span>
                                     </button>
                                 );
                             })}
@@ -119,21 +75,27 @@ export const PreviewPanel = () => {
             </div>
 
             {/* Preview Area */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar flex justify-center bg-background">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar flex justify-center bg-[#1e1e1e]">
                 <div className="relative">
                     {/* Page 1 */}
-                    <div className="w-[210mm] min-h-[297mm] bg-white origin-top transform scale-90 sm:scale-100 transition-transform duration-300" style={{ boxShadow: 'var(--shadow-xl)' }}>
+                    <div
+                        className="bg-white origin-top transform scale-90 sm:scale-100 transition-transform duration-300 shadow-2xl"
+                        style={{
+                            width: pageWidth,
+                            minHeight: pageHeight
+                        }}
+                    >
                         {renderTemplate()}
                     </div>
 
-                    {/* Page Break Indicator - positioned at exactly 297mm */}
-                    <div className="absolute left-0 right-0 transform scale-90 sm:scale-100" style={{ top: '297mm' }}>
+                    {/* Page Break Indicator */}
+                    <div className="absolute left-0 right-0 transform scale-90 sm:scale-100 pointer-events-none" style={{ top: pageHeight }}>
                         <div className="flex items-center justify-center">
-                            <div className="flex-1 border-t-2 border-dashed border-red-500"></div>
-                            <span className="px-4 py-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg">
-                                ⚠ PAGE 2 STARTS HERE - REDUCE CONTENT
+                            <div className="flex-1 border-t-2 border-dashed border-red-500/50"></div>
+                            <span className="px-4 py-1.5 bg-red-900/80 backdrop-blur-sm text-red-200 text-xs font-bold rounded-full shadow-lg border border-red-500/50">
+                                ⚠ PAGE 2 STARTS HERE
                             </span>
-                            <div className="flex-1 border-t-2 border-dashed border-red-500"></div>
+                            <div className="flex-1 border-t-2 border-dashed border-red-500/50"></div>
                         </div>
                     </div>
                 </div>

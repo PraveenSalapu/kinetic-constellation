@@ -21,12 +21,12 @@ const agentIcons: Record<AgentType, any> = {
 };
 
 const agentColors: Record<AgentType, string> = {
-  career_coach: 'text-blue-600',
-  resume_optimizer: 'text-green-600',
-  job_matcher: 'text-purple-600',
-  research: 'text-orange-600',
-  writing: 'text-pink-600',
-  interview_prep: 'text-indigo-600'
+  career_coach: 'text-blue-400',
+  resume_optimizer: 'text-green-400',
+  job_matcher: 'text-purple-400',
+  research: 'text-orange-400',
+  writing: 'text-pink-400',
+  interview_prep: 'text-indigo-400'
 };
 
 export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps) {
@@ -142,17 +142,16 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
     return (
       <div className="mt-2 space-y-1 text-xs">
         {thoughts.slice(-5).map((thought, idx) => (
-          <div key={idx} className="flex items-start gap-2 p-2 bg-gray-50 rounded">
-            <span className={`font-semibold ${
-              thought.type === 'observation' ? 'text-blue-600' :
-              thought.type === 'reasoning' ? 'text-green-600' :
-              thought.type === 'plan' ? 'text-purple-600' :
-              thought.type === 'action' ? 'text-orange-600' :
-              'text-gray-600'
-            }`}>
+          <div key={idx} className="flex items-start gap-2 p-2 bg-[#1a1a1a] border border-gray-800 rounded">
+            <span className={`font-semibold ${thought.type === 'observation' ? 'text-blue-400' :
+              thought.type === 'reasoning' ? 'text-green-400' :
+                thought.type === 'plan' ? 'text-purple-400' :
+                  thought.type === 'action' ? 'text-orange-400' :
+                    'text-gray-400'
+              }`}>
               [{thought.type}]
             </span>
-            <span className="text-gray-700 flex-1">{thought.content}</span>
+            <span className="text-gray-300 flex-1">{thought.content}</span>
           </div>
         ))}
       </div>
@@ -160,23 +159,23 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg shadow-lg">
+    <div className="flex flex-col h-full bg-[#111] rounded-lg shadow-lg border border-gray-800">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-purple-600" />
-          <h2 className="text-xl font-bold">AI Agent Workspace</h2>
+          <Sparkles className="w-6 h-6 text-purple-400" />
+          <h2 className="text-xl font-bold text-gray-200">AI Agent Workspace</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowThoughts(!showThoughts)}
-            className={`px-3 py-1 text-sm rounded ${showThoughts ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'}`}
+            className={`px-3 py-1 text-sm rounded transition-colors ${showThoughts ? 'bg-purple-900/20 text-purple-300 border border-purple-800' : 'bg-[#1a1a1a] text-gray-400 border border-gray-700'}`}
           >
             {showThoughts ? 'Hide' : 'Show'} Thoughts
           </button>
           <button
             onClick={handleReset}
-            className="p-2 rounded hover:bg-gray-100"
+            className="p-2 rounded hover:bg-[#1a1a1a] text-gray-400 hover:text-white transition-colors"
             title="Reset all agents"
           >
             <RotateCcw className="w-5 h-5" />
@@ -186,13 +185,12 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
 
       <div className="flex flex-1 overflow-hidden">
         {/* Agent Selection Sidebar */}
-        <div className="w-48 border-r bg-gray-50 p-2 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Agents</div>
+        <div className="w-48 border-r border-gray-800 bg-[#151515] p-2 overflow-y-auto">
+          <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Agents</div>
           <button
             onClick={() => setSelectedAgent('orchestrator')}
-            className={`w-full flex items-center gap-2 p-2 rounded mb-1 text-left ${
-              selectedAgent === 'orchestrator' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
-            }`}
+            className={`w-full flex items-center gap-2 p-2 rounded mb-1 text-left transition-colors ${selectedAgent === 'orchestrator' ? 'bg-purple-900/20 text-purple-300 border border-purple-800/50' : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-gray-200'
+              }`}
           >
             <Brain className="w-4 h-4" />
             <span className="text-sm">Orchestrator</span>
@@ -204,36 +202,33 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
               <button
                 key={agentType}
                 onClick={() => setSelectedAgent(agentType)}
-                className={`w-full flex items-center gap-2 p-2 rounded mb-1 text-left ${
-                  selectedAgent === agentType ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
-                }`}
+                className={`w-full flex items-center gap-2 p-2 rounded mb-1 text-left transition-colors ${selectedAgent === agentType ? 'bg-purple-900/20 text-purple-300 border border-purple-800/50' : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-gray-200'
+                  }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? agentColors[agentType] : 'text-gray-400'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? agentColors[agentType] : 'text-gray-500'}`} />
                 <span className="text-sm capitalize">{agentType.replace('_', ' ')}</span>
-                {isActive && <div className="ml-auto w-2 h-2 bg-green-500 rounded-full" />}
+                {isActive && <div className="ml-auto w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
               </button>
             );
           })}
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-[#0F0F0F]">
           {/* Mode Toggle */}
-          <div className="flex gap-2 p-2 border-b">
+          <div className="flex gap-2 p-2 border-b border-gray-800 bg-[#111]">
             <button
               onClick={() => setChatMode(false)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded ${
-                !chatMode ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded transition-colors ${!chatMode ? 'bg-purple-900/20 text-purple-300 border border-purple-800/50' : 'bg-[#1a1a1a] text-gray-400 border border-gray-800 hover:bg-[#222]'
+                }`}
             >
               <Play className="w-4 h-4" />
               <span>Goal Mode</span>
             </button>
             <button
               onClick={() => setChatMode(true)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded ${
-                chatMode ? 'bg-purple-100 text-purple-700' : 'bg-gray-100'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded transition-colors ${chatMode ? 'bg-purple-900/20 text-purple-300 border border-purple-800/50' : 'bg-[#1a1a1a] text-gray-400 border border-gray-800 hover:bg-[#222]'
+                }`}
             >
               <MessageSquare className="w-4 h-4" />
               <span>Chat Mode</span>
@@ -242,21 +237,21 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
 
           {!chatMode ? (
             /* Goal Mode */
-            <div className="flex-1 flex flex-col p-4 overflow-y-auto">
+            <div className="flex-1 flex flex-col p-4 overflow-y-auto custom-scrollbar">
               <div className="mb-4">
-                <label className="block text-sm font-semibold mb-2">Enter your goal:</label>
+                <label className="block text-sm font-semibold mb-2 text-gray-300">Enter your goal:</label>
                 <textarea
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
                   placeholder="e.g., 'Optimize my resume for a Senior Software Engineer role at Google' or 'Help me prepare for a product manager interview'"
-                  className="w-full p-3 border rounded-lg resize-none"
+                  className="w-full p-3 bg-[#1a1a1a] border border-gray-700 rounded-lg resize-none text-gray-200 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-gray-600"
                   rows={3}
                   disabled={isRunning}
                 />
                 <button
                   onClick={handleRunGoal}
                   disabled={isRunning || !goal.trim()}
-                  className="mt-2 flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-2 flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-all"
                 >
                   {isRunning ? (
                     <>
@@ -275,33 +270,32 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
               {/* Orchestrator State Visualization */}
               {orchestratorState && (
                 <div className="flex-1 space-y-4">
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <div className="text-sm font-semibold mb-2">Status: {orchestratorState.status}</div>
-                    <div className="text-xs text-gray-600">
+                  <div className="p-3 bg-purple-900/10 border border-purple-800/30 rounded-lg">
+                    <div className="text-sm font-semibold mb-2 text-purple-300">Status: {orchestratorState.status}</div>
+                    <div className="text-xs text-gray-400">
                       Tasks: {orchestratorState.tasks.filter(t => t.status === 'completed').length} / {orchestratorState.tasks.length} completed
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-sm font-semibold">Tasks:</div>
+                    <div className="text-sm font-semibold text-gray-300">Tasks:</div>
                     {orchestratorState.tasks.map((task, idx) => (
-                      <div key={idx} className="p-3 border rounded-lg">
+                      <div key={idx} className="p-3 border border-gray-800 bg-[#1a1a1a] rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-2 h-2 rounded-full ${
-                            task.status === 'completed' ? 'bg-green-500' :
+                          <div className={`w-2 h-2 rounded-full ${task.status === 'completed' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' :
                             task.status === 'in_progress' ? 'bg-blue-500 animate-pulse' :
-                            task.status === 'failed' ? 'bg-red-500' :
-                            'bg-gray-300'
-                          }`} />
-                          <span className="text-sm font-medium">{task.description}</span>
+                              task.status === 'failed' ? 'bg-red-500' :
+                                'bg-gray-600'
+                            }`} />
+                          <span className="text-sm font-medium text-gray-200">{task.description}</span>
                         </div>
                         {task.assignedAgent && (
-                          <div className="text-xs text-gray-600 ml-4">
+                          <div className="text-xs text-gray-500 ml-4">
                             Agent: {task.assignedAgent}
                           </div>
                         )}
                         {task.result && (
-                          <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                          <div className="mt-2 p-2 bg-[#111] border border-gray-800 rounded text-xs text-gray-400 font-mono">
                             Result: {JSON.stringify(task.result, null, 2).substring(0, 200)}...
                           </div>
                         )}
@@ -314,7 +308,7 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
               {/* Agent Thoughts */}
               {selectedAgent !== 'orchestrator' && agentStates.has(selectedAgent) && (
                 <div className="mt-4">
-                  <div className="text-sm font-semibold mb-2">Agent Thoughts:</div>
+                  <div className="text-sm font-semibold mb-2 text-gray-300">Agent Thoughts:</div>
                   {renderThoughts(agentStates.get(selectedAgent)!.thoughts)}
                 </div>
               )}
@@ -322,21 +316,20 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
           ) : (
             /* Chat Mode */
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] p-3 rounded-lg ${
-                      msg.role === 'user'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    }`}>
+                    <div className={`max-w-[80%] p-3 rounded-lg text-sm ${msg.role === 'user'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-[#1a1a1a] border border-gray-800 text-gray-200'
+                      }`}>
                       {msg.content}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t p-3">
+              <div className="border-t border-gray-800 p-3 bg-[#111]">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -344,11 +337,11 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleChat()}
                     placeholder="Ask me anything about your career or resume..."
-                    className="flex-1 p-2 border rounded-lg"
+                    className="flex-1 p-2 bg-[#1a1a1a] border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:border-purple-500 placeholder-gray-600"
                   />
                   <button
                     onClick={handleChat}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors shadow-sm"
                   >
                     Send
                   </button>

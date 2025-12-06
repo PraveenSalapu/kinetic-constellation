@@ -27,29 +27,29 @@ export const Skills = () => {
     return (
         <CollapsibleSection
             title="Skills"
-            icon={<Award className="text-primary" size={18} />}
+            icon={<Award className="text-indigo-400" size={18} />}
             defaultOpen={false}
         >
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-4 bg-[#111]">
                 <div className="flex justify-end">
                     <button
                         onClick={handleAddCategory}
-                        className="btn-primary btn-sm flex items-center gap-2"
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
                     >
-                        <Plus size={16} />
+                        <Plus size={14} />
                         Add Category
                     </button>
                 </div>
 
                 {skills.length === 0 ? (
-                    <div className="text-center py-8 border-2 border-dashed border-border rounded-lg bg-background">
-                        <Award size={48} className="mx-auto mb-3 text-text-muted" />
-                        <p className="text-sm text-text-secondary mb-3">No skills added yet</p>
+                    <div className="text-center py-8 border border-dashed border-gray-800 rounded-lg bg-[#1a1a1a]">
+                        <Award size={32} className="mx-auto mb-3 text-gray-600" />
+                        <p className="text-sm text-gray-400 mb-3">No skills added yet</p>
                         <button
                             onClick={handleAddCategory}
-                            className="btn-secondary btn-sm"
+                            className="text-indigo-400 hover:text-indigo-300 text-sm font-medium flex items-center justify-center gap-1"
                         >
-                            <Plus size={16} className="inline mr-2" />
+                            <Plus size={14} />
                             Add Your First Category
                         </button>
                     </div>
@@ -57,45 +57,45 @@ export const Skills = () => {
                     skills.map((skillGroup) => (
                         <div
                             key={skillGroup.id}
-                            className="card p-4 space-y-3 group"
+                            className="p-4 bg-[#1a1a1a] border border-gray-800 rounded-lg space-y-4 group hover:border-gray-700 transition-colors"
                         >
                             <div className="flex items-start justify-between">
-                                <div className="flex-1 space-y-3">
+                                <div className="flex-1 space-y-4">
                                     {/* Category Name */}
                                     <div>
-                                        <label className="label-field">Category Name</label>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">Category Name</label>
                                         <input
                                             type="text"
                                             value={skillGroup.category}
                                             onChange={(e) => updateField(skillGroup.id, 'category', e.target.value)}
-                                            className="input-field"
+                                            className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                             placeholder="e.g., Programming Languages, Frameworks, Tools"
                                         />
                                     </div>
 
-                                    <div className="divider my-3"></div>
+                                    <div className="border-t border-gray-800 my-3"></div>
 
                                     {/* Skills */}
                                     <div className="space-y-3">
-                                        <label className="label-field">
-                                            Skills {skillGroup.items.length > 0 && <span className="text-primary">({skillGroup.items.length})</span>}
+                                        <label className="block text-xs font-medium text-gray-400">
+                                            Skills {skillGroup.items.length > 0 && <span className="text-indigo-400">({skillGroup.items.length})</span>}
                                         </label>
-                                        <div className="flex flex-wrap gap-2 min-h-[44px] p-3 bg-surface border border-border rounded-lg">
+                                        <div className="flex flex-wrap gap-2 min-h-[44px] p-3 bg-[#111] border border-gray-800 rounded-lg">
                                             {skillGroup.items.length === 0 ? (
-                                                <span className="text-sm text-text-secondary">No skills added - type below and press Enter</span>
+                                                <span className="text-sm text-gray-500 italic">No skills added - type below and press Enter</span>
                                             ) : (
                                                 skillGroup.items.map((item, idx) => (
                                                     <span
                                                         key={idx}
-                                                        className="group/tag px-3 py-1.5 bg-primary text-surface rounded-full text-sm font-medium flex items-center gap-2"
+                                                        className="group/tag px-3 py-1 bg-indigo-900/40 text-indigo-300 border border-indigo-700/50 rounded-full text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95"
                                                     >
                                                         {item}
                                                         <button
                                                             onClick={() => handleRemoveSkill(skillGroup.id, skillGroup.items, item)}
-                                                            className="hover:bg-surface/20 rounded-full p-0.5 transition-colors"
+                                                            className="hover:text-white transition-colors p-0.5"
                                                             title="Remove skill"
                                                         >
-                                                            <X size={14} />
+                                                            <X size={12} />
                                                         </button>
                                                     </span>
                                                 ))
@@ -103,7 +103,7 @@ export const Skills = () => {
                                         </div>
                                         <input
                                             type="text"
-                                            className="input-field"
+                                            className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                             placeholder="Type a skill and press Enter to add..."
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
@@ -113,13 +113,13 @@ export const Skills = () => {
                                                 }
                                             }}
                                         />
-                                        <p className="text-xs text-text-secondary mt-1">Press Enter to add each skill</p>
+                                        <p className="text-xs text-gray-500 mt-1">Press Enter to add each skill</p>
                                     </div>
                                 </div>
 
                                 <button
                                     onClick={() => deleteItem(skillGroup.id)}
-                                    className="btn-icon ml-4 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/10 hover:border-error hover:text-error"
+                                    className="p-2 text-gray-600 hover:text-red-400 bg-transparent hover:bg-red-900/20 rounded-lg transition-all ml-2"
                                     title="Delete category"
                                 >
                                     <Trash2 size={16} />

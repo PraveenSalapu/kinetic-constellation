@@ -145,12 +145,20 @@ class JobSearchDatabase {
   private db: IDBDatabase | null = null;
   private readonly DB_NAME = 'JobSearchTracker';
   private readonly VERSION = 1;
+  private initPromise: Promise<void> | null = null;
 
   async initialize(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.db) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, this.VERSION);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+          this.initPromise = null; // Reset on failure
+          reject(request.error);
+      };
+      
       request.onsuccess = () => {
         this.db = request.result;
         resolve();
@@ -192,6 +200,8 @@ class JobSearchDatabase {
         }
       };
     });
+    
+    return this.initPromise;
   }
 
   // Application CRUD operations

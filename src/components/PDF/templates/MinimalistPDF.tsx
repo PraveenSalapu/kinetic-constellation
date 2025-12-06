@@ -11,7 +11,8 @@ export const MinimalistPDF = ({ resume }: { resume: Resume }) => {
         sectionSpacing: 5,
         nameSize: 20,
         contactSize: 9,
-        margin: { top: 15, right: 15, bottom: 15, left: 15 }
+        margin: { top: 15, right: 15, bottom: 15, left: 15 },
+        fontFamily: 'Helvetica'
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
@@ -42,7 +43,7 @@ export const MinimalistPDF = ({ resume }: { resume: Resume }) => {
             paddingRight: marginRight,
             paddingBottom: marginBottom,
             paddingLeft: marginLeft,
-            fontFamily: 'Helvetica',
+            fontFamily: layout.fontFamily || 'Helvetica',
             fontSize: baseFontSize,
             color: '#000',
             lineHeight: lineHeight,
@@ -77,26 +78,31 @@ export const MinimalistPDF = ({ resume }: { resume: Resume }) => {
         experienceItem: {
             marginBottom: 10,
         },
-        expHeader: {
+        // Mapped for SectionRenderer compatibility
+        row: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'baseline',
             marginBottom: 2,
         },
-        expPosition: {
+        position: {
             fontSize: baseFontSize + 1,
             fontWeight: 'bold',
             color: '#000',
         },
-        expDate: {
+        date: {
             fontSize: baseFontSize - 1,
             color: '#000',
         },
-        expCompany: {
+        company: {
             fontSize: baseFontSize,
             fontWeight: 'bold',
             color: '#000',
             marginBottom: 4,
+        },
+        location: {
+            fontSize: baseFontSize - 1,
+            color: '#000',
         },
         bullet: {
             flexDirection: 'row',

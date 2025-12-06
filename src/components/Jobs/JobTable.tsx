@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useResume } from '../../context/ResumeContext';
+import { WifiOff } from 'lucide-react';
 
 // 1. CONFIGURATION
 const N8N_WEBHOOK_URL = "http://localhost:5678/webhook/live-jobs"; // <--- Direct URL (Ensure CORS is enabled in n8n)
@@ -19,17 +20,64 @@ interface ApiResponse {
     results: Job[];
 }
 
+// MOCK DATA FOR FALLBACK
+const MOCK_JOBS: Job[] = [
+    {
+        company: "Nebula AI Systems",
+        title: "Senior Full Stack Engineer",
+        link: "https://example.com/job/1",
+        match_score: 92,
+        missing_skills: [],
+        summary: "Leading the development of our core AI infrastructure. Looking for strong React and Node.js experience. Great fit for your background in full-stack development."
+    },
+    {
+        company: "TechFlow Corp",
+        title: "Backend Developer",
+        link: "https://example.com/job/2",
+        match_score: 78,
+        missing_skills: ["Kubernetes", "Go"],
+        summary: "Building high-scale distributed systems. Requires strong knowledge of microservices architecture. You match 80% of the requirements but missing Go experience."
+    },
+    {
+        company: "Creative Solutions Inc",
+        title: "Frontend Architect",
+        link: "https://example.com/job/3",
+        match_score: 65,
+        missing_skills: ["GraphQL", "Webpack", "Figma"],
+        summary: "We need a design-minded engineer to overhaul our UI library. Your profile lacks specific design tool experience mentioned in the JD."
+    }
+];
+
 export const JobTable: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const { resume } = useResume();
+    const [usingMockData, setUsingMockData] = useState<boolean>(false);
+    const { resume, dispatch } = useResume(); // Update destructuring
 
-    // 3. FETCH DATA
+    const handleTailor = (job: Job) => {
+        dispatch({
+            type: 'START_TAILORING',
+            payload: {
+                job: {
+                    title: job.title,
+                    company: job.company,
+                    description: job.summary || '', // AI Summary serves as JD context
+                    link: job.link
+                }
+            }
+        });
+    };
+
+
+
+
     useEffect(() => {
         const fetchJobs = async () => {
             try {
                 setLoading(true);
+                setError(null);
+                setUsingMockData(false);
 
                 // Construct the payload based on current resume data
                 // We map frontend state to clean n8n payload
@@ -53,7 +101,7 @@ export const JobTable: React.FC = () => {
 
                 // Add a timeout because the parallel search and AI scoring can take 10-20 seconds
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 120000); // 60 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // Short timeout to fail fast to mock
 
                 const response = await fetch(N8N_WEBHOOK_URL, {
                     method: "POST",
@@ -94,8 +142,9 @@ export const JobTable: React.FC = () => {
 
                 setJobs(sortedJobs);
             } catch (err: any) {
-                console.error("Fetch failed:", err);
-                setError("Failed to load jobs. Is n8n active?");
+                console.warn("n8n Fetch failed, falling back to mock data:", err);
+                setUsingMockData(true);
+                setJobs(MOCK_JOBS);
             } finally {
                 setLoading(false);
             }
@@ -106,16 +155,16 @@ export const JobTable: React.FC = () => {
 
     // 4. RENDERING HELPERS
     const getScoreColor = (score: number) => {
-        if (score >= 80) return "bg-green-100 text-green-800 border-green-200";
-        if (score >= 50) return "bg-yellow-100 text-yellow-800 border-yellow-200";
-        return "bg-red-100 text-red-800 border-red-200";
+        if (score >= 80) return "bg-green-900/20 text-green-400 border-green-800";
+        if (score >= 50) return "bg-yellow-900/20 text-yellow-400 border-yellow-800";
+        return "bg-red-900/20 text-red-400 border-red-800";
     };
 
     if (loading) {
         return (
             <div className="flex justify-center items-center h-full min-h-[500px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-500">Scanning live jobs...</span>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <span className="ml-3 text-gray-400">Scanning live jobs...</span>
             </div>
         );
     }
@@ -123,7 +172,7 @@ export const JobTable: React.FC = () => {
     if (error) {
         return (
             <div className="p-8 flex justify-center items-center h-full">
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 max-w-lg text-center">
+                <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-400 max-w-lg text-center">
                     <h3 className="font-bold mb-2">Connection Error</h3>
                     <p>{error}</p>
                     <p className="text-sm mt-2 text-red-500">Make sure your local n8n instance is running and the webhook URL is correct.</p>
@@ -133,72 +182,82 @@ export const JobTable: React.FC = () => {
     }
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen w-full">
+        <div className="p-6 bg-[#111] min-h-screen w-full font-mono text-gray-200">
             <div className="max-w-7xl mx-auto">
-                <h1 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
                     <span className="text-3xl">🚀</span> Live Job Board
                 </h1>
-                <p className="text-sm text-gray-500 mb-6 flex items-center gap-2">
-                    Matches for: <span className="font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
+                <p className="text-sm text-gray-400 mb-6 flex items-center gap-2">
+                    Matches for: <span className="font-semibold text-green-400 bg-green-900/20 border border-green-800 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
                 </p>
 
+                {usingMockData && (
+                    <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg flex items-center gap-3 text-yellow-200 animate-in fade-in slide-in-from-top-2">
+                        <WifiOff size={20} />
+                        <div>
+                            <p className="text-sm font-bold">Demo Mode Active</p>
+                            <p className="text-xs text-yellow-400/80">Live n8n connection unavailable. Showing sample data for demonstration.</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* AIRTABLE-STYLE CONTAINER */}
-                <div className="bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden">
+                <div className="bg-[#1a1a1a] border border-gray-800 shadow-sm rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
+                        <table className="min-w-full divide-y divide-gray-800">
 
                             {/* TABLE HEADER */}
-                            <thead className="bg-gray-50">
+                            <thead className="bg-[#222]">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
                                         Match
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
                                         Role & Company
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
                                         Missing Skills
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-r border-gray-100">
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
                                         AI Summary
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                                         Action
                                     </th>
                                 </tr>
                             </thead>
 
                             {/* TABLE BODY */}
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-[#1a1a1a] divide-y divide-gray-800">
                                 {jobs.map((job, index) => (
-                                    <tr key={index} className="hover:bg-blue-50 transition-colors duration-150 ease-in-out group">
+                                    <tr key={index} className="hover:bg-[#252525] transition-colors duration-150 ease-in-out group">
 
                                         {/* SCORE COLUMN */}
-                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-100">
+                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-800">
                                             <span className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full border ${getScoreColor(job.match_score)}`}>
                                                 {job.match_score}%
                                             </span>
                                         </td>
 
                                         {/* ROLE COLUMN */}
-                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-100">
+                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-800">
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-semibold text-gray-900">{job.title}</span>
+                                                <span className="text-sm font-semibold text-gray-200">{job.title}</span>
                                                 <span className="text-sm text-gray-500">{job.company}</span>
                                             </div>
                                         </td>
 
                                         {/* SKILLS COLUMN (TAGS) */}
-                                        <td className="px-6 py-4 border-r border-gray-100 max-w-xs">
+                                        <td className="px-6 py-4 border-r border-gray-800 max-w-xs">
                                             <div className="flex flex-wrap gap-2">
                                                 {job.missing_skills.length > 0 ? (
                                                     job.missing_skills.map((skill, i) => (
-                                                        <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-100">
+                                                        <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-red-900/20 text-red-400 border border-red-800">
                                                             {skill}
                                                         </span>
                                                     ))
                                                 ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-900/20 text-green-400 border border-green-800">
                                                         Perfect Match
                                                     </span>
                                                 )}
@@ -206,24 +265,31 @@ export const JobTable: React.FC = () => {
                                         </td>
 
                                         {/* SUMMARY COLUMN */}
-                                        <td className="px-6 py-4 text-sm text-gray-500 border-r border-gray-100 max-w-xs relative group">
+                                        <td className="px-6 py-4 text-sm text-gray-500 border-r border-gray-800 max-w-xs relative group">
                                             <div className="line-clamp-2">{job.summary}</div>
                                             {/* Hover Tooltip */}
-                                            <div className="hidden group-hover:block absolute z-10 left-0 top-full mt-1 p-3 bg-white border border-gray-200 shadow-xl rounded-lg w-72 text-sm text-gray-700 whitespace-normal">
+                                            <div className="hidden group-hover:block absolute z-10 left-0 top-full mt-1 p-3 bg-gray-900 border border-gray-700 shadow-xl rounded-lg w-72 text-sm text-gray-300 whitespace-normal">
                                                 {job.summary}
                                             </div>
                                         </td>
 
                                         {/* APPLY BUTTON */}
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2">
                                             <a
                                                 href={job.link}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors shadow-sm text-xs uppercase font-bold tracking-wide"
+                                                className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors shadow-sm text-xs uppercase font-bold tracking-wide"
                                             >
                                                 Apply
                                             </a>
+                                            <button
+                                                onClick={() => handleTailor(job)}
+                                                className="text-indigo-300 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-800 px-3 py-1.5 rounded-md transition-colors text-xs font-bold tracking-wide flex items-center gap-1"
+                                                title="Tailor Resume for this Job"
+                                            >
+                                                <span className="mr-1">✨</span> Tailor
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -233,13 +299,13 @@ export const JobTable: React.FC = () => {
                         {/* EMPTY STATE */}
                         {jobs.length === 0 && !loading && (
                             <div className="text-center py-16">
-                                <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+                                <div className="mx-auto h-12 w-12 text-gray-600 mb-4">
                                     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                     </svg>
                                 </div>
-                                <h3 className="mt-2 text-sm font-medium text-gray-900">No jobs found</h3>
-                                <p className="mt-1 text-sm text-gray-500">We couldn't find any new listings in the last 24 hours.</p>
+                                <h3 className="mt-2 text-sm font-medium text-gray-300">No jobs found</h3>
+                                <p className="mt-1 text-sm text-gray-600">We couldn't find any new listings in the last 24 hours.</p>
                             </div>
                         )}
                     </div>

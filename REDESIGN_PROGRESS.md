@@ -190,11 +190,11 @@ removeBullet('exp-1', 0);
 ## 🎯 NEXT PRIORITIES
 
 ### Phase 1: Continue Reducing Repetition (1-2 weeks)
-1. ⬜ **Refactor All Sections to Use Hooks**
-   - Education.tsx → useSection
-   - Projects.tsx → useBulletSection
-   - Certifications.tsx → useSection
-   - Experience.tsx → useBulletSection (most complex)
+1. ✅ **Refactor All Sections to Use Hooks**
+   - ✅ Education.tsx → useSection
+   - ✅ Projects.tsx → useSection (useBulletSection not needed for current schema)
+   - ✅ Certifications.tsx → useSection
+   - ✅ Experience.tsx → useBulletSection
 
 2. ⬜ **Create DynamicForm Component**
    - Schema-based form generation

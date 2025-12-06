@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Settings, ChevronDown, RotateCcw, Maximize } from 'lucide-react';
+import { Settings, ChevronDown, RotateCcw } from 'lucide-react';
 import { useResume } from '../../context/ResumeContext';
 
 export const LayoutSettings = () => {
@@ -14,12 +14,20 @@ export const LayoutSettings = () => {
         sectionSpacing: 5,
         nameSize: 20,
         contactSize: 9,
-        margin: { top: 15, right: 15, bottom: 15, left: 15 }
+        margin: { top: 15, right: 15, bottom: 15, left: 15 },
+        fontFamily: 'Inter' // Default
     };
 
     const layout = resume.layout && typeof resume.layout.fontSize === 'number'
         ? { ...defaultLayout, ...resume.layout }
         : defaultLayout;
+
+    const availableFonts = [
+        { label: 'Times New Roman (Serif)', value: 'Times-Roman' },
+        { label: 'Arial (Sans)', value: 'Helvetica' },
+        { label: 'Courier (Mono)', value: 'Courier' },
+        { label: 'Inter (Modern)', value: 'Inter' }
+    ];
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -58,18 +66,6 @@ export const LayoutSettings = () => {
         }
     };
 
-    const handleAutoFit = () => {
-        dispatch({
-            type: 'APPLY_LAYOUT',
-            payload: {
-                fontSize: 9,
-                lineHeight: 1.2,
-                sectionSpacing: 3,
-                margin: { top: 10, right: 10, bottom: 10, left: 10 }
-            }
-        });
-    };
-
     const handleReset = () => {
         dispatch({
             type: 'APPLY_LAYOUT',
@@ -81,7 +77,7 @@ export const LayoutSettings = () => {
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`p-2 rounded-lg transition-all flex items-center gap-1 ${isOpen ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                className={`p-2 rounded-lg transition-all flex items-center gap-1 ${isOpen ? 'bg-indigo-900/20 text-indigo-400' : 'text-gray-400 hover:text-indigo-400 hover:bg-indigo-900/20'}`}
                 title="Layout Settings"
             >
                 <Settings size={20} />
@@ -89,22 +85,36 @@ export const LayoutSettings = () => {
             </button>
 
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-4">
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-                        <h3 className="font-semibold text-gray-800">PDF Layout Settings</h3>
-                        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-[#1a1a1a] rounded-xl shadow-xl border border-gray-700 z-50 p-4 text-gray-300">
+                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-700">
+                        <h3 className="font-semibold text-white">PDF Layout Settings</h3>
+                        <button onClick={() => setIsOpen(false)} className="text-gray-500 hover:text-white">
                             <ChevronDown size={16} />
                         </button>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                        {/* Font Selection */}
+                        <div>
+                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Font Family</h4>
+                            <select
+                                value={layout.fontFamily || 'Times-Roman'}
+                                onChange={(e) => updateLayout({ fontFamily: e.target.value })}
+                                className="w-full bg-gray-800 border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {availableFonts.map(f => (
+                                    <option key={f.value} value={f.value}>{f.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         {/* Typography Section */}
                         <div>
                             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Typography</h4>
 
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
-                                    <label className="text-sm text-gray-700">Body Font Size</label>
+                                    <label className="text-sm text-gray-400">Body Font Size</label>
                                     <span className="text-xs text-gray-500">{layout.fontSize}pt</span>
                                 </div>
                                 <input
@@ -114,13 +124,13 @@ export const LayoutSettings = () => {
                                     step="0.5"
                                     value={layout.fontSize}
                                     onChange={(e) => updateLayout({ fontSize: parseFloat(e.target.value) })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                             </div>
 
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
-                                    <label className="text-sm text-gray-700">Name Size</label>
+                                    <label className="text-sm text-gray-400">Name Size</label>
                                     <span className="text-xs text-gray-500">{layout.nameSize}pt</span>
                                 </div>
                                 <input
@@ -130,13 +140,13 @@ export const LayoutSettings = () => {
                                     step="1"
                                     value={layout.nameSize}
                                     onChange={(e) => updateLayout({ nameSize: parseFloat(e.target.value) })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                             </div>
 
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
-                                    <label className="text-sm text-gray-700">Contact Info Size</label>
+                                    <label className="text-sm text-gray-400">Contact Info Size</label>
                                     <span className="text-xs text-gray-500">{layout.contactSize}pt</span>
                                 </div>
                                 <input
@@ -146,13 +156,13 @@ export const LayoutSettings = () => {
                                     step="0.5"
                                     value={layout.contactSize}
                                     onChange={(e) => updateLayout({ contactSize: parseFloat(e.target.value) })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                             </div>
 
                             <div>
                                 <div className="flex justify-between mb-1">
-                                    <label className="text-sm text-gray-700">Line Height</label>
+                                    <label className="text-sm text-gray-400">Line Height</label>
                                     <span className="text-xs text-gray-500">{layout.lineHeight}</span>
                                 </div>
                                 <input
@@ -162,7 +172,7 @@ export const LayoutSettings = () => {
                                     step="0.1"
                                     value={layout.lineHeight}
                                     onChange={(e) => updateLayout({ lineHeight: parseFloat(e.target.value) })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                             </div>
                         </div>
@@ -173,7 +183,7 @@ export const LayoutSettings = () => {
 
                             <div className="mb-4">
                                 <div className="flex justify-between mb-1">
-                                    <label className="text-sm text-gray-700">Section Gap</label>
+                                    <label className="text-sm text-gray-400">Section Gap</label>
                                     <span className="text-xs text-gray-500">{layout.sectionSpacing}mm</span>
                                 </div>
                                 <input
@@ -183,7 +193,7 @@ export const LayoutSettings = () => {
                                     step="0.5"
                                     value={layout.sectionSpacing}
                                     onChange={(e) => updateLayout({ sectionSpacing: parseFloat(e.target.value) })}
-                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                 />
                             </div>
                         </div>
@@ -198,7 +208,7 @@ export const LayoutSettings = () => {
                                         type="number"
                                         value={layout.margin.top}
                                         onChange={(e) => updateLayout({ top: parseFloat(e.target.value) })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-indigo-500"
+                                        className="w-full px-2 py-1 text-sm bg-gray-800 border border-gray-700 text-white rounded focus:outline-none focus:border-indigo-500"
                                     />
                                 </div>
                                 <div>
@@ -207,7 +217,7 @@ export const LayoutSettings = () => {
                                         type="number"
                                         value={layout.margin.bottom}
                                         onChange={(e) => updateLayout({ bottom: parseFloat(e.target.value) })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-indigo-500"
+                                        className="w-full px-2 py-1 text-sm bg-gray-800 border border-gray-700 text-white rounded focus:outline-none focus:border-indigo-500"
                                     />
                                 </div>
                                 <div>
@@ -216,7 +226,7 @@ export const LayoutSettings = () => {
                                         type="number"
                                         value={layout.margin.left}
                                         onChange={(e) => updateLayout({ left: parseFloat(e.target.value) })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-indigo-500"
+                                        className="w-full px-2 py-1 text-sm bg-gray-800 border border-gray-700 text-white rounded focus:outline-none focus:border-indigo-500"
                                     />
                                 </div>
                                 <div>
@@ -225,24 +235,17 @@ export const LayoutSettings = () => {
                                         type="number"
                                         value={layout.margin.right}
                                         onChange={(e) => updateLayout({ right: parseFloat(e.target.value) })}
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-indigo-500"
+                                        className="w-full px-2 py-1 text-sm bg-gray-800 border border-gray-700 text-white rounded focus:outline-none focus:border-indigo-500"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* Actions */}
-                        <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
-                            <button
-                                onClick={handleAutoFit}
-                                className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Maximize size={16} />
-                                Auto Fit to 1 Page
-                            </button>
+                        <div className="pt-2 border-t border-gray-700 flex flex-col gap-2">
                             <button
                                 onClick={handleReset}
-                                className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-2 bg-gray-800 text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
                             >
                                 <RotateCcw size={16} />
                                 Reset to Defaults

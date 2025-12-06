@@ -7,6 +7,16 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: API_KEY || '' });
 const MODEL_NAME = 'gemini-2.0-flash';
 
+const cleanJsonOutput = (text: string): string => {
+    let cleaned = text.trim();
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    return cleaned;
+};
+
 export const parseResumeWithAI = async (resumeText: string): Promise<Resume> => {
     if (!API_KEY) throw new Error('API Key missing');
 
@@ -95,7 +105,7 @@ export const parseResumeWithAI = async (resumeText: string): Promise<Resume> => 
         const text = result.text;
         if (!text) throw new Error("No response from AI");
 
-        const parsed = JSON.parse(text);
+        const parsed = JSON.parse(cleanJsonOutput(text));
 
         // Merge with initialResume to ensure all required fields and IDs exist
         // We regenerate IDs for all list items to ensure uniqueness and prevent key collisions

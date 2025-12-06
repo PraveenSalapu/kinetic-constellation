@@ -12,25 +12,26 @@ export const CollapsibleSection = ({ title, icon, children, defaultOpen = true }
     const [isOpen, setIsOpen] = useState(defaultOpen);
 
     return (
-        <div className="card">
+        <div className="bg-[#111] border border-gray-800 rounded-xl overflow-hidden shadow-sm transition-all hover:border-gray-700">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4 hover:bg-background/50 transition-colors rounded-t-xl"
+                className="w-full flex items-center justify-between p-4 hover:bg-[#1a1a1a] transition-colors"
+                aria-expanded={isOpen}
             >
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
+                    <div className="p-2 bg-indigo-900/20 rounded-lg text-indigo-400">
                         {icon}
                     </div>
-                    <h3 className="text-base font-semibold text-text">{title}</h3>
+                    <h3 className="text-sm font-semibold text-gray-200 tracking-wide">{title}</h3>
                 </div>
                 {isOpen ? (
-                    <ChevronUp size={20} className="text-text-secondary" />
+                    <ChevronUp size={16} className="text-gray-500" />
                 ) : (
-                    <ChevronDown size={20} className="text-text-secondary" />
+                    <ChevronDown size={16} className="text-gray-500" />
                 )}
             </button>
             {isOpen && (
-                <div className="border-t border-border">
+                <div className="border-t border-gray-800">
                     {children}
                 </div>
             )}

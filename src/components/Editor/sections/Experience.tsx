@@ -1,69 +1,33 @@
-import { useResume } from '../../../context/ResumeContext';
 import { Plus, Trash2, Sparkles, X, Briefcase, Calendar, MapPin } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import { useState } from 'react';
 import { optimizeBulletPoint } from '../../../services/gemini';
 import { CollapsibleSection } from '../CollapsibleSection';
+import { useBulletSection } from '../../../hooks/useSection';
+import type { ExperienceItem } from '../../../types';
 
 export const Experience = () => {
-    const { resume, dispatch } = useResume();
+    const { items: experience, addItem, deleteItem, updateField, addBullet, removeBullet, updateBullet } = useBulletSection<ExperienceItem>('experience');
     const [optimizing, setOptimizing] = useState<{ id: string; index: number } | null>(null);
     const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
 
     const handleAdd = () => {
-        dispatch({
-            type: 'ADD_ITEM',
-            payload: {
-                sectionId: 'experience',
-                item: {
-                    id: uuidv4(),
-                    company: '',
-                    position: '',
-                    startDate: '',
-                    endDate: '',
-                    current: false,
-                    description: [''],
-                    location: '',
-                },
-            },
+        addItem({
+            company: '',
+            position: '',
+            startDate: '',
+            endDate: '',
+            current: false,
+            description: [''],
+            location: '',
         });
     };
 
-    const handleDelete = (id: string) => {
-        dispatch({
-            type: 'DELETE_ITEM',
-            payload: { sectionId: 'experience', itemId: id },
-        });
-    };
-
-    const handleChange = (id: string, field: string, value: any) => {
-        dispatch({
-            type: 'UPDATE_ITEM',
-            payload: {
-                sectionId: 'experience',
-                itemId: id,
-                item: { [field]: value },
-            },
-        });
-    };
-
-    const handleAddBullet = (expId: string, currentBullets: string[]) => {
-        handleChange(expId, 'description', [...currentBullets, '']);
-    };
-
-    const handleRemoveBullet = (expId: string, currentBullets: string[], index: number) => {
-        const newBullets = currentBullets.filter((_, i) => i !== index);
-        handleChange(expId, 'description', newBullets);
+    const handleRemoveBulletSafe = (expId: string, index: number) => {
+        removeBullet(expId, index);
         const key = `${expId}-${index}`;
         const newSuggestions = { ...suggestions };
         delete newSuggestions[key];
         setSuggestions(newSuggestions);
-    };
-
-    const handleUpdateBullet = (expId: string, currentBullets: string[], index: number, value: string) => {
-        const newBullets = [...currentBullets];
-        newBullets[index] = value;
-        handleChange(expId, 'description', newBullets);
     };
 
     const handleOptimizeBullet = async (expId: string, currentBullets: string[], index: number) => {
@@ -91,8 +55,8 @@ export const Experience = () => {
         }
     };
 
-    const applySuggestion = (expId: string, currentBullets: string[], index: number, suggestion: string) => {
-        handleUpdateBullet(expId, currentBullets, index, suggestion);
+    const applySuggestion = (expId: string, index: number, suggestion: string) => {
+        updateBullet(expId, index, suggestion);
         const key = `${expId}-${index}`;
         setSuggestions(prev => {
             const next = { ...prev };
@@ -101,131 +65,141 @@ export const Experience = () => {
         });
     };
 
+
+
+
+
     return (
         <CollapsibleSection
             title="Work Experience"
-            icon={<Briefcase className="text-primary" size={18} />}
+            icon={<Briefcase className="text-indigo-400" size={18} />}
             defaultOpen={false}
         >
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 bg-[#111]">
                 <div className="flex justify-end">
-                    <button onClick={handleAdd} className="btn-primary btn-sm flex items-center gap-2">
-                        <Plus size={16} />
+                    <button onClick={handleAdd} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors">
+                        <Plus size={14} />
                         Add Experience
                     </button>
                 </div>
-                {resume.experience.length === 0 ? (
-                    <div className="text-center py-8 border-2 border-dashed border-border rounded-lg bg-background">
-                        <Briefcase size={48} className="mx-auto mb-3 text-text-muted" />
-                        <p className="text-sm text-text-secondary mb-3">No experience added yet</p>
-                        <button onClick={handleAdd} className="btn-secondary btn-sm">
-                            <Plus size={16} className="inline mr-2" />
+                {experience.length === 0 ? (
+                    <div className="text-center py-8 border border-dashed border-gray-800 rounded-lg bg-[#1a1a1a]">
+                        <Briefcase size={32} className="mx-auto mb-3 text-gray-600" />
+                        <p className="text-sm text-gray-400 mb-3">No experience added yet</p>
+                        <button onClick={handleAdd} className="text-indigo-400 hover:text-indigo-300 text-sm font-medium flex items-center justify-center gap-1">
+                            <Plus size={14} />
                             Add Your First Role
                         </button>
                     </div>
                 ) : (
-                    resume.experience.map((exp) => (
-                        <div key={exp.id} className="card p-4 space-y-3 group">
+                    experience.map((exp) => (
+                        <div key={exp.id} className="p-4 bg-[#1a1a1a] border border-gray-800 rounded-lg space-y-4 group hover:border-gray-700 transition-colors">
                             <div className="flex items-start justify-between">
-                                <div className="flex-1 space-y-3">
+                                <div className="flex-1 space-y-4">
                                     {/* Company & Position */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="label-field">
-                                                <Briefcase size={14} className="inline mr-1" />
+                                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                                <Briefcase size={12} className="inline mr-1" />
                                                 Company
                                             </label>
                                             <input
                                                 type="text"
                                                 value={exp.company}
-                                                onChange={(e) => handleChange(exp.id, 'company', e.target.value)}
-                                                className="input-field"
+                                                onChange={(e) => updateField(exp.id, 'company', e.target.value)}
+                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                                 placeholder="Company Name"
                                             />
                                         </div>
                                         <div>
-                                            <label className="label-field">Job Title</label>
+                                            <label className="block text-xs font-medium text-gray-400 mb-1">Job Title</label>
                                             <input
                                                 type="text"
                                                 value={exp.position}
-                                                onChange={(e) => handleChange(exp.id, 'position', e.target.value)}
-                                                className="input-field"
+                                                onChange={(e) => updateField(exp.id, 'position', e.target.value)}
+                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                                 placeholder="Your Position"
                                             />
                                         </div>
                                     </div>
 
                                     {/* Dates & Location */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="label-field">
-                                                <Calendar size={14} className="inline mr-1" />
+                                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                                <Calendar size={12} className="inline mr-1" />
                                                 Start Date
                                             </label>
                                             <input
                                                 type="text"
                                                 value={exp.startDate}
-                                                onChange={(e) => handleChange(exp.id, 'startDate', e.target.value)}
-                                                className="input-field"
+                                                onChange={(e) => updateField(exp.id, 'startDate', e.target.value)}
+                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                                 placeholder="MM/YYYY"
                                             />
                                         </div>
                                         <div>
-                                            <label className="label-field">End Date</label>
+                                            <label className="block text-xs font-medium text-gray-400 mb-1">End Date</label>
                                             <input
                                                 type="text"
                                                 value={exp.endDate}
-                                                onChange={(e) => handleChange(exp.id, 'endDate', e.target.value)}
+                                                onChange={(e) => updateField(exp.id, 'endDate', e.target.value)}
                                                 disabled={exp.current}
-                                                className="input-field disabled:bg-background disabled:opacity-60"
+                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                                 placeholder={exp.current ? 'Present' : 'MM/YYYY'}
                                             />
                                         </div>
                                         <div>
-                                            <label className="label-field">
-                                                <MapPin size={14} className="inline mr-1" />
+                                            <label className="block text-xs font-medium text-gray-400 mb-1">
+                                                <MapPin size={12} className="inline mr-1" />
                                                 Location
                                             </label>
                                             <input
                                                 type="text"
                                                 value={exp.location || ''}
-                                                onChange={(e) => handleChange(exp.id, 'location', e.target.value)}
-                                                className="input-field"
+                                                onChange={(e) => updateField(exp.id, 'location', e.target.value)}
+                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                                                 placeholder="City, State"
                                             />
                                         </div>
                                     </div>
 
                                     {/* Current Work Checkbox */}
-                                    <label className="flex items-center gap-2 cursor-pointer">
+                                    <label className="flex items-center gap-2 cursor-pointer group/check">
                                         <input
                                             type="checkbox"
                                             checked={exp.current}
-                                            onChange={(e) => handleChange(exp.id, 'current', e.target.checked)}
-                                            className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/20"
+                                            onChange={(e) => updateField(exp.id, 'current', e.target.checked)}
+                                            className="w-4 h-4 rounded border-gray-600 bg-[#111] text-indigo-500 focus:ring-offset-0 focus:ring-1 focus:ring-indigo-500"
                                         />
-                                        <span className="text-sm text-text">I currently work here</span>
+                                        <span className="text-xs text-gray-400 group-hover/check:text-gray-300 transition-colors">I currently work here</span>
                                     </label>
 
-                                    <div className="divider my-3"></div>
+                                    <div className="border-t border-gray-800 my-3"></div>
 
                                     {/* Achievements */}
                                     <div className="space-y-3">
-                                        <label className="label-field">Key Achievements & Responsibilities</label>
+                                        <label className="block text-xs font-medium text-gray-400">Key Achievements & Responsibilities</label>
                                         {exp.description.map((bullet, idx) => (
                                             <div key={idx} className="space-y-2">
                                                 <div className="flex gap-2">
                                                     <textarea
                                                         value={bullet}
-                                                        onChange={(e) => handleUpdateBullet(exp.id, exp.description, idx, e.target.value)}
-                                                        className="textarea-field"
+                                                        onChange={(e) => updateBullet(exp.id, idx, e.target.value)}
+                                                        onInput={(e) => {
+                                                            const target = e.target as HTMLTextAreaElement;
+                                                            target.style.height = 'auto';
+                                                            target.style.height = target.scrollHeight + 'px';
+                                                        }}
+                                                        className="flex-1 bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all min-h-[40px] resize-none overflow-hidden"
                                                         placeholder="Describe your impact and achievements..."
+                                                        rows={1}
                                                     />
                                                     <div className="flex flex-col gap-2">
                                                         <button
                                                             onClick={() => handleOptimizeBullet(exp.id, exp.description, idx)}
                                                             disabled={optimizing?.id === exp.id && optimizing?.index === idx}
-                                                            className="btn-icon"
+                                                            className="p-2 text-gray-500 hover:text-indigo-400 hover:bg-indigo-900/20 rounded-lg transition-colors border border-transparent hover:border-indigo-500/30"
                                                             title="Optimize with AI"
                                                         >
                                                             <Sparkles
@@ -234,8 +208,8 @@ export const Experience = () => {
                                                             />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleRemoveBullet(exp.id, exp.description, idx)}
-                                                            className="btn-icon hover:bg-error/10 hover:border-error hover:text-error"
+                                                            onClick={() => handleRemoveBulletSafe(exp.id, idx)}
+                                                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-500/30"
                                                         >
                                                             <X size={16} />
                                                         </button>
@@ -244,17 +218,17 @@ export const Experience = () => {
 
                                                 {/* AI Suggestions */}
                                                 {suggestions[`${exp.id}-${idx}`] && (
-                                                    <div className="ml-2 p-4 bg-primary-light border border-primary/20 rounded-lg space-y-2">
-                                                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                                                            <Sparkles size={14} />
+                                                    <div className="ml-2 p-3 bg-indigo-900/10 border border-indigo-500/30 rounded-lg space-y-2 animate-in fade-in slide-in-from-top-2">
+                                                        <div className="flex items-center gap-2 text-xs font-medium text-indigo-400">
+                                                            <Sparkles size={12} />
                                                             <span>AI Suggestions</span>
                                                         </div>
                                                         <div className="space-y-2">
                                                             {suggestions[`${exp.id}-${idx}`].map((suggestion, sIdx) => (
                                                                 <button
                                                                     key={sIdx}
-                                                                    onClick={() => applySuggestion(exp.id, exp.description, idx, suggestion)}
-                                                                    className="w-full text-left p-3 bg-surface border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all text-sm"
+                                                                    onClick={() => applySuggestion(exp.id, idx, suggestion)}
+                                                                    className="w-full text-left p-2.5 bg-[#111] border border-gray-700 rounded text-sm text-gray-300 hover:border-indigo-500/50 hover:bg-indigo-500/10 transition-all font-light"
                                                                 >
                                                                     {suggestion}
                                                                 </button>
@@ -265,18 +239,19 @@ export const Experience = () => {
                                             </div>
                                         ))}
                                         <button
-                                            onClick={() => handleAddBullet(exp.id, exp.description)}
-                                            className="btn-secondary btn-sm flex items-center gap-2"
+                                            onClick={() => addBullet(exp.id)}
+                                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 px-1"
                                         >
-                                            <Plus size={14} />
+                                            <Plus size={12} />
                                             Add Achievement
                                         </button>
                                     </div>
                                 </div>
 
                                 <button
-                                    onClick={() => handleDelete(exp.id)}
-                                    className="btn-icon ml-4 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error/10 hover:border-error hover:text-error"
+                                    onClick={() => deleteItem(exp.id)}
+                                    className="p-2 text-gray-600 hover:text-red-400 bg-transparent hover:bg-red-900/20 rounded-lg transition-all ml-2"
+                                    title="Delete Experience"
                                 >
                                     <Trash2 size={16} />
                                 </button>
