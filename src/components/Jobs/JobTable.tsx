@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useResume } from '../../context/ResumeContext';
-import { WifiOff } from 'lucide-react';
+import { WifiOff, Calendar } from 'lucide-react';
+import { fetchDailyJobs } from '../../services/jsearch';
 
 // 1. CONFIGURATION
 const N8N_WEBHOOK_URL = "http://localhost:5678/webhook/live-jobs"; // <--- Direct URL (Ensure CORS is enabled in n8n)
 
 // 2. TYPES
-interface Job {
+export interface Job {
     company: string;
     title: string;
     link: string;
@@ -53,7 +54,7 @@ export const JobTable: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [usingMockData, setUsingMockData] = useState<boolean>(false);
-    const { resume, dispatch } = useResume(); // Update destructuring
+    const { resume, dispatch } = useResume();
 
     const handleTailor = (job: Job) => {
         dispatch({
@@ -69,8 +70,23 @@ export const JobTable: React.FC = () => {
         });
     };
 
+    const handleFetchDailyJobs = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            setUsingMockData(false);
 
+            // Use the query from user request or default
+            const jobs = await fetchDailyJobs("developer jobs in chicago");
+            setJobs(jobs);
 
+        } catch (err: any) {
+            console.error("Daily fetch failed:", err);
+            setError(`Daily fetch failed: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -115,7 +131,10 @@ export const JobTable: React.FC = () => {
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    throw new Error(`Error: ${response.statusText}`);
+                    console.warn("N8N failed, trying fallback to Daily Jobs (JSearch)...");
+                    const dailyJobs = await fetchDailyJobs();
+                    setJobs(dailyJobs);
+                    return; // Success with fallback
                 }
 
                 const data: ApiResponse = await response.json();
@@ -142,9 +161,15 @@ export const JobTable: React.FC = () => {
 
                 setJobs(sortedJobs);
             } catch (err: any) {
-                console.warn("n8n Fetch failed, falling back to mock data:", err);
-                setUsingMockData(true);
-                setJobs(MOCK_JOBS);
+                console.warn("n8n Fetch failed, trying fallback to Daily Jobs:", err);
+                try {
+                    const dailyJobs = await fetchDailyJobs();
+                    setJobs(dailyJobs);
+                } catch (fallbackErr) {
+                    console.error("Both N8N and JSearch failed, using mock data");
+                    setUsingMockData(true);
+                    setJobs(MOCK_JOBS);
+                }
             } finally {
                 setLoading(false);
             }
@@ -184,12 +209,23 @@ export const JobTable: React.FC = () => {
     return (
         <div className="p-6 bg-[#111] min-h-screen w-full font-mono text-gray-200">
             <div className="max-w-7xl mx-auto">
-                <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                    <span className="text-3xl">🚀</span> Live Job Board
-                </h1>
-                <p className="text-sm text-gray-400 mb-6 flex items-center gap-2">
-                    Matches for: <span className="font-semibold text-green-400 bg-green-900/20 border border-green-800 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
-                </p>
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                            <span className="text-3xl">🚀</span> Live Job Board
+                        </h1>
+                        <p className="text-sm text-gray-400 flex items-center gap-2">
+                            Matches for: <span className="font-semibold text-green-400 bg-green-900/20 border border-green-800 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleFetchDailyJobs}
+                        className="bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                    >
+                        <Calendar className="w-4 h-4" />
+                        <span>Fetch Daily Jobs</span>
+                    </button>
+                </div>
 
                 {usingMockData && (
                     <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg flex items-center gap-3 text-yellow-200 animate-in fade-in slide-in-from-top-2">
