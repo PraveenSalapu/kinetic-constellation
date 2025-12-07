@@ -26,6 +26,8 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         experience: { [key: string]: { revised: number[], recommended: number[] } },
         projects: number[]
     }>({ experience: {}, projects: [] });
+    const [isSavingApp, setIsSavingApp] = useState(false);
+    const [appSaved, setAppSaved] = useState(false);
 
     // ... (useEffect hooks remain unchanged) ...
     // Update local state if prop changes or resume context has tailoring job
@@ -68,8 +70,6 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
             setSelectedImprovements({ experience: {}, projects: [] });
         }
     }, [isOpen]);
-
-    if (!isOpen) return null;
 
     const handleAnalyze = async () => {
         if (!jobDescription.trim()) return;
@@ -126,9 +126,6 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         });
     };
 
-    const [isSavingApp, setIsSavingApp] = useState(false);
-    const [appSaved, setAppSaved] = useState(false);
-
     const handleTrackApplication = async () => {
         setIsSavingApp(true);
         try {
@@ -150,7 +147,6 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                 lastUpdated: new Date(),
                 source: 'AI Tailor',
                 timeline: [{ date: new Date(), status: 'applied', notes: 'Application created via AI Tailor' }],
-                notes: `Tailored for: ${title} at ${company}`,
                 resumeSnapshot: resume // Save the current (tailored) resume state
             });
 
@@ -267,23 +263,28 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
 
         // Update resume state
-        dispatch({
-            type: 'SET_RESUME',
-            payload: {
-                ...resume,
-                summary: tailoredSummary,
-                skills: newSkills,
-                experience: newExperience,
-                projects: newProjects,
-                // Explicitly reset tailoring state
-                isTailoring: false,
-                tailoringJob: undefined,
-                originalResume: null
-            }
-        });
+        try {
+            dispatch({
+                type: 'SET_RESUME',
+                payload: {
+                    ...resume,
+                    summary: tailoredSummary,
+                    skills: newSkills,
+                    experience: newExperience,
+                    projects: newProjects,
 
-        addToast('success', 'Changes applied to resume');
+                }
+            });
+
+            addToast('success', 'Changes applied to resume');
+            onClose(); // Close modal after applying changes
+        } catch (error) {
+            console.error('Error applying changes:', error);
+            addToast('error', 'Failed to apply changes');
+        }
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
@@ -392,7 +393,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                                                     <div key={rIdx} className="flex items-start gap-3 text-sm group">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedImprovements.experience[exp.experienceId]?.revised.includes(rIdx)}
+                                                                            checked={selectedImprovements.experience[exp.experienceId]?.revised.includes(rIdx) ?? false}
                                                                             onChange={() => toggleExperienceSelection(exp.experienceId, 'revised', rIdx)}
                                                                             className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900"
                                                                         />
@@ -415,7 +416,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                                                     <div key={recIdx} className="flex items-start gap-3 text-sm group">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedImprovements.experience[exp.experienceId]?.recommended.includes(recIdx)}
+                                                                            checked={selectedImprovements.experience[exp.experienceId]?.recommended.includes(recIdx) ?? false}
                                                                             onChange={() => toggleExperienceSelection(exp.experienceId, 'recommended', recIdx)}
                                                                             className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900"
                                                                         />

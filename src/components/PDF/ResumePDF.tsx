@@ -23,7 +23,7 @@ export const ResumePDF = ({ resume }: ResumePDFProps) => {
             case 'classic':
                 return <ClassicPDF resume={resume} />;
             case 'minimalist':
-                return <MinimalistPDF resume={resume} />;
+                return <ModernPDF resume={resume} />;
             case 'modern':
             default:
                 return <ModernPDF resume={resume} />;
