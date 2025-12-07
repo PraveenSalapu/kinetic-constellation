@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useResume } from '../../context/ResumeContext';
+import { useToast } from '../../context/ToastContext';
 import { PersonalInfo } from './sections/PersonalInfo';
 import { Summary } from './sections/Summary';
 import { Experience } from './sections/Experience';
@@ -17,7 +18,7 @@ import { Download, FileText, Users, Wand2, XCircle, Save } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
 import { getDatabase } from '../../services/database/mongodb';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 } from 'uuid';
 import {
     DndContext,
     closestCenter,
@@ -37,18 +38,17 @@ import { SortableSection } from './SortableSection';
 
 import { LayoutSettings } from './LayoutSettings';
 
+import ErrorBoundary from '../ErrorBoundary';
+
+
+
 export const EditorPanel = () => {
+
     const { resume, dispatch } = useResume();
-    const [isTailorModalOpen, setIsTailorModalOpen] = useState(false);
+    const { addToast } = useToast();
     const [isCoverLetterModalOpen, setIsCoverLetterModalOpen] = useState(false);
     const [isProfileManagerOpen, setIsProfileManagerOpen] = useState(false);
     const [showATSScore, setShowATSScore] = useState(false);
-
-    useEffect(() => {
-        if (resume.isTailoring && resume.tailoringJob) {
-            setIsTailorModalOpen(true);
-        }
-    }, [resume.isTailoring, resume.tailoringJob]);
 
     const handleSaveApplication = async () => {
         if (!resume.tailoringJob) return;
@@ -58,7 +58,7 @@ export const EditorPanel = () => {
             await db.initialize();
 
             await db.createApplication({
-                id: uuidv4(),
+                id: v4(),
                 userId: 'user123',
                 company: resume.tailoringJob.company,
                 jobTitle: resume.tailoringJob.title,
@@ -72,10 +72,10 @@ export const EditorPanel = () => {
                 notes: `Tailored Resume Version based on AI optimization.`,
                 lastUpdated: new Date()
             });
-            alert('Application saved to tracker!');
+            addToast('success', 'Application saved to tracker!');
         } catch (err) {
             console.error(err);
-            alert('Failed to save to tracker');
+            addToast('error', 'Failed to save to tracker');
         }
     };
 
@@ -112,9 +112,10 @@ export const EditorPanel = () => {
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+            addToast('success', 'PDF Downloaded successfully');
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
+            addToast('error', 'Failed to generate PDF. Please try again.');
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -138,7 +139,7 @@ export const EditorPanel = () => {
                 ...section,
                 order: index
             }));
-            
+
             dispatch({ type: 'REORDER_SECTIONS', payload: newSections });
         }
     };
@@ -227,7 +228,9 @@ export const EditorPanel = () => {
                             >
                                 <XCircle size={20} />
                             </button>
-                            <ATSScore />
+                            <ErrorBoundary> {/* Wrap ATSScore component with ErrorBoundary */}
+                                <ATSScore />
+                            </ErrorBoundary>
                         </div>
                     )}
 
@@ -262,8 +265,9 @@ export const EditorPanel = () => {
             </div>
 
             <TailorModal
-                isOpen={isTailorModalOpen}
-                onClose={() => setIsTailorModalOpen(false)}
+                isOpen={resume.isTailoring}
+                onClose={() => dispatch({ type: 'DISCARD_TAILORING' })}
+                jobDescription={resume.tailoringJob?.description}
             />
 
             <CoverLetterModal
