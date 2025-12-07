@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
 import { useToast } from '../../context/ToastContext';
 import { PersonalInfo } from './sections/PersonalInfo';
@@ -10,10 +10,13 @@ import { Projects } from './sections/Projects';
 import { Certifications } from './sections/Certifications';
 import { CustomSection } from './sections/CustomSection';
 import { TailorModal } from './TailorModal';
+import { TrackApplicationModal } from './TrackApplicationModal';
+import { PostTailoringModal } from './PostTailoringModal';
 import { ATSScore } from './ATSScore';
 import { CoverLetterModal } from './CoverLetterModal';
 import { ProfileManager } from '../Profile/ProfileManager';
 import { UndoRedoButtons } from './UndoRedoButtons';
+import { ConfirmModal } from '../UI/ConfirmModal';
 import { Download, FileText, Users, Wand2, XCircle, Save } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
@@ -49,7 +52,16 @@ export const EditorPanel = () => {
     const [isCoverLetterModalOpen, setIsCoverLetterModalOpen] = useState(false);
     const [isProfileManagerOpen, setIsProfileManagerOpen] = useState(false);
     const [showATSScore, setShowATSScore] = useState(false);
+    const [showTailorModal, setShowTailorModal] = useState(false);
 
+    // Auto-open modal if we arrive at the editor in tailoring mode (e.g. from Jobs page)
+    useEffect(() => {
+        if (resume.isTailoring) {
+            setShowTailorModal(true);
+        }
+    }, []); // Run only on mount
+    const [showTrackModal, setShowTrackModal] = useState(false);
+    const [showPostTailorModal, setShowPostTailorModal] = useState(false);
     const handleSaveApplication = async () => {
         if (!resume.tailoringJob) return;
 
@@ -73,6 +85,9 @@ export const EditorPanel = () => {
                 lastUpdated: new Date()
             });
             addToast('success', 'Application saved to tracker!');
+            if (resume.isTailoring) {
+                setShowTrackModal(true);
+            }
         } catch (err) {
             console.error(err);
             addToast('error', 'Failed to save to tracker');
@@ -83,14 +98,30 @@ export const EditorPanel = () => {
         if (!resume.isTailoring) {
             dispatch({ type: 'START_TAILORING' });
         }
+        setShowTailorModal(true);
         setShowATSScore(true);
     };
 
+    const [confirmModal, setConfirmModal] = useState<{
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        confirmText?: string;
+        cancelText?: string;
+        variant?: 'danger' | 'warning' | 'info';
+    } | null>(null);
+
     const handleDiscardTailoring = () => {
-        if (confirm('Are you sure you want to discard all tailoring changes?')) {
-            dispatch({ type: 'DISCARD_TAILORING' });
-            setShowATSScore(false);
-        }
+        setConfirmModal({
+            title: 'Discard Tailoring?',
+            message: 'Are you sure you want to discard all tailoring changes? This action cannot be undone.',
+            confirmText: 'Discard Changes',
+            variant: 'danger',
+            onConfirm: () => {
+                dispatch({ type: 'DISCARD_TAILORING' });
+                setShowATSScore(false);
+            }
+        });
     };
 
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -113,6 +144,11 @@ export const EditorPanel = () => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
             addToast('success', 'PDF Downloaded successfully');
+
+            // Show track modal if in tailoring mode
+            if (resume.isTailoring) {
+                setShowTrackModal(true);
+            }
         } catch (error) {
             console.error('Error generating PDF:', error);
             addToast('error', 'Failed to generate PDF. Please try again.');
@@ -127,7 +163,54 @@ export const EditorPanel = () => {
             coordinateGetter: sortableKeyboardCoordinates,
         })
     );
+    const handleTrackApplication = async () => {
+        console.log('handleTrackApplication called!');
+        console.log('resume.tailoringJob:', resume.tailoringJob);
+        if (!resume.tailoringJob) {
+            console.log('No tailoringJob found, exiting...');
+            return;
+        }
 
+        try {
+            const db = getDatabase();
+            await db.initialize();
+
+            await db.createApplication({
+                id: v4(),
+                userId: 'user123',
+                company: resume.tailoringJob.company || 'Unknown Company',
+                jobTitle: resume.tailoringJob.title || 'Unknown Position',
+                jobDescription: resume.tailoringJob.description || '',
+                jobUrl: resume.tailoringJob.link,
+                status: 'applied',
+                appliedDate: new Date(),
+                lastUpdated: new Date(),
+                source: 'AI Tailor',
+                timeline: [{
+                    date: new Date(),
+                    status: 'applied',
+                    notes: 'Application tracked after tailoring'
+                }],
+                resumeSnapshot: resume,
+                tags: [],
+                notes: ''
+            });
+
+            console.log('Application saved successfully!');
+            addToast('success', `Tracked: ${resume.tailoringJob.title} at ${resume.tailoringJob.company}`);
+
+            console.log('Discarding tailoring...');
+            // Reset to base version
+            dispatch({ type: 'DISCARD_TAILORING' });
+            setShowTrackModal(false);
+
+            // TODO: Navigate to tracking/jobs page
+            addToast('info', 'Navigating to jobs tracker...');
+        } catch (error) {
+            console.error('Error tracking application:', error);
+            addToast('error', 'Failed to track application');
+        }
+    };
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
 
@@ -143,6 +226,18 @@ export const EditorPanel = () => {
             dispatch({ type: 'REORDER_SECTIONS', payload: newSections });
         }
     };
+
+    // Safety Check: If resume data is missing (e.g. during load or failed parse), show loading state
+    if (!resume || !resume.sections || !resume.personalInfo) {
+        return (
+            <div className="h-full flex items-center justify-center bg-[#111] text-gray-400">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p>Loading resume editor...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full flex flex-col bg-[#111] border-r border-gray-800 text-gray-200">
@@ -242,11 +337,11 @@ export const EditorPanel = () => {
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext
-                            items={resume.sections.map(s => s.id)}
+                            items={(resume.sections || []).map(s => s.id)}
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="space-y-3">
-                                {resume.sections
+                                {(resume.sections || [])
                                     .filter((section) => section.isVisible)
                                     .map((section) => (
                                         <SortableSection key={section.id} id={section.id}>
@@ -265,9 +360,12 @@ export const EditorPanel = () => {
             </div>
 
             <TailorModal
-                isOpen={resume.isTailoring}
-                onClose={() => dispatch({ type: 'DISCARD_TAILORING' })}
-                jobDescription={resume.tailoringJob?.description}
+                isOpen={showTailorModal}
+                onClose={() => {
+                    setShowTailorModal(false);
+                    setShowATSScore(false);
+                }}
+                jobDescription={resume.tailoringJob?.description || ''}
             />
 
             <CoverLetterModal
@@ -278,6 +376,36 @@ export const EditorPanel = () => {
             <ProfileManager
                 isOpen={isProfileManagerOpen}
                 onClose={() => setIsProfileManagerOpen(false)}
+            />
+            <TrackApplicationModal
+                isOpen={showTrackModal}
+                onClose={() => {
+                    // User clicked "Skip"
+                    setConfirmModal({
+                        title: 'Skip Tracking?',
+                        message: 'Are you sure you don\'t want to track this application? You won\'t be able to see it in your dashboard later.',
+                        confirmText: 'Skip Tracking',
+                        variant: 'warning',
+                        onConfirm: () => {
+                            dispatch({ type: 'DISCARD_TAILORING' });
+                            setShowTrackModal(false);
+                            addToast('info', 'Navigating to jobs page...');
+                        }
+                    });
+                }}
+                onTrack={handleTrackApplication}
+                jobTitle={resume.tailoringJob?.title}
+                company={resume.tailoringJob?.company}
+            />
+            <ConfirmModal
+                isOpen={!!confirmModal}
+                onClose={() => setConfirmModal(null)}
+                onConfirm={confirmModal?.onConfirm || (() => { })}
+                title={confirmModal?.title || ''}
+                message={confirmModal?.message || ''}
+                confirmText={confirmModal?.confirmText}
+                cancelText={confirmModal?.cancelText}
+                variant={confirmModal?.variant}
             />
         </div>
     );

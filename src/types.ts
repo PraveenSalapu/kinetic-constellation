@@ -87,6 +87,16 @@ export interface Resume {
             left: number; // mm
         };
     };
+
+    // Tailoring State
+    isTailoring?: boolean;
+    tailoringJob?: {
+        company: string;
+        title: string;
+        description: string;
+        link?: string;
+    };
+    originalResume?: Resume;
 }
 
 export interface UserProfile {
@@ -98,8 +108,10 @@ export interface UserProfile {
 
 export interface TailorResponse {
     tailoredSummary: string;
-    missingHardSkills: string[];
+    missingHardSkills: { name: string; category: string }[];
     reasoning: string;
+    jobTitle?: string;
+    company?: string;
     improvedExperience?: {
         experienceId: string;
         revisedBullets: {
@@ -130,4 +142,12 @@ export interface BulletPointResponse {
     original: string;
     improved: string;
     explanation: string;
+}
+
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
+
+export interface Toast {
+    id: string;
+    type: ToastType;
+    message: string;
 }

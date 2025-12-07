@@ -198,7 +198,8 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
             const migratedTemplate = (profileData as any).selectedTemplate || 'modern';
 
             return {
-                ...profileData,
+                ...initialResume, // 1. Start with defaults to ensure structure
+                ...profileData,   // 2. Overlay stored data
                 selectedTemplate: migratedTemplate,
                 layout: migratedLayout
             } as ResumeState;

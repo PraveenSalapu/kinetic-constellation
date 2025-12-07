@@ -147,7 +147,9 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                 lastUpdated: new Date(),
                 source: 'AI Tailor',
                 timeline: [{ date: new Date(), status: 'applied', notes: 'Application created via AI Tailor' }],
-                resumeSnapshot: resume // Save the current (tailored) resume state
+                resumeSnapshot: resume,
+                tags: ['Tailored', 'AI Generated'],
+                notes: `Auto-tracked after AI tailoring for ${tailorResult?.jobTitle || 'job'}`
             });
 
             setAppSaved(true);
@@ -172,7 +174,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
             missingHardSkills.forEach(skill => {
                 // Find matching category (case-insensitive)
                 const existingCategoryIndex = newSkills.findIndex(s =>
-                    s.category.toLowerCase().trim() === skill.category.toLowerCase().trim()
+                    (s.category || '').toLowerCase().trim() === (skill.category || '').toLowerCase().trim()
                 );
 
                 if (existingCategoryIndex >= 0) {
@@ -272,12 +274,20 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                     skills: newSkills,
                     experience: newExperience,
                     projects: newProjects,
-
+                    // CRITICAL: Preserve tailoring state so master resume stays unchanged
+                    isTailoring: true,
+                    originalResume: resume.originalResume,
+                    tailoringJob: {
+                        company: tailorResult.company || 'Unknown Company',
+                        title: tailorResult.jobTitle || 'Unknown Position',
+                        description: jobDescription,
+                        link: '' // Could add a field for this later
+                    }
                 }
             });
 
-            addToast('success', 'Changes applied to resume');
-            onClose(); // Close modal after applying changes
+            addToast('success', '✅ Changes applied! Your master resume stays unchanged.');
+            onClose();
         } catch (error) {
             console.error('Error applying changes:', error);
             addToast('error', 'Failed to apply changes');
@@ -363,10 +373,10 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                                 {tailorResult.missingHardSkills.map((skill, idx) => (
                                                     <span
                                                         key={idx}
-                                                        className="px-3 py-1 bg-green-900/30 border border-green-700/50 rounded-full text-green-300 text-sm flex items-center gap-2"
+                                                        className="px-4 py-2 bg-green-950/60 border border-green-500/50 rounded-full text-green-100 text-base font-medium flex items-center gap-2 shadow-sm transition-transform hover:scale-105 whitespace-nowrap"
                                                     >
                                                         {skill.name}
-                                                        <span className="text-xs text-green-500/70 border-l border-green-700/50 pl-2 uppercase tracking-wider">{skill.category}</span>
+                                                        <span className="text-xs text-green-400 font-bold pl-2 border-l border-green-500/50 uppercase tracking-wider">{skill.category}</span>
                                                     </span>
                                                 ))}
                                             </div>

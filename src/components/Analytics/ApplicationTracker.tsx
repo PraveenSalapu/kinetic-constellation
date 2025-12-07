@@ -1,17 +1,46 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Edit2, Save, Calendar, Briefcase, MapPin, Link as LinkIcon } from 'lucide-react';
+import { Plus, X, Edit2, Save, Calendar, Briefcase, MapPin, Link as LinkIcon, Download } from 'lucide-react';
+import { ConfirmModal } from '../UI/ConfirmModal';
 import { getDatabase, type ApplicationRecord } from '../../services/database/mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { pdf } from '@react-pdf/renderer';
+import { ResumePDF } from '../PDF/ResumePDF';
+import { useToast } from '../../context/ToastContext';
 
 interface ApplicationTrackerProps {
   userId: string;
 }
 
 export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
+  const { addToast } = useToast();
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleDownload = async (app: ApplicationRecord) => {
+    if (!app.resumeSnapshot) {
+      addToast('error', 'No resume saved for this application');
+      return;
+    }
+
+    try {
+      addToast('info', 'Generating PDF...');
+      const blob = await pdf(<ResumePDF resume={app.resumeSnapshot} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${app.company.replace(/\s+/g, '_')}_${app.jobTitle.replace(/\s+/g, '_')}_Resume.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      addToast('success', 'PDF Downloaded');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      addToast('error', 'Failed to generate PDF');
+    }
+  };
   const [formData, setFormData] = useState<Partial<ApplicationRecord> & { salaryText?: string; notes?: string }>({
     userId,
     company: '',
@@ -95,15 +124,31 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
     setShowAddForm(true);
   };
 
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+  } | null>(null);
+
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this application?')) {
-      try {
-        await db.deleteApplication(id);
-        await loadApplications();
-      } catch (error) {
-        console.error('Error deleting application:', error);
+    setConfirmModal({
+      title: 'Delete Application?',
+      message: 'Are you sure you want to delete this application? This action cannot be undone.',
+      confirmText: 'Delete Application',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await db.deleteApplication(id);
+          await loadApplications();
+        } catch (error) {
+          console.error('Error deleting application:', error);
+        }
       }
-    }
+    });
   };
 
   const resetForm = () => {
@@ -354,6 +399,17 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
+                    onClick={() => handleDownload(app)}
+                    disabled={!app.resumeSnapshot}
+                    className={`p-2 rounded-lg transition-colors ${app.resumeSnapshot
+                      ? 'text-gray-500 hover:text-green-400 hover:bg-green-900/20'
+                      : 'text-gray-700 cursor-not-allowed'
+                      }`}
+                    title={app.resumeSnapshot ? "Download Resume Snapshot" : "No resume saved"}
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleDelete(app.id)}
                     className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                     title="Delete"
@@ -366,6 +422,17 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
           ))}
         </div>
       )}
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        onConfirm={confirmModal?.onConfirm || (() => { })}
+        title={confirmModal?.title || ''}
+        message={confirmModal?.message || ''}
+        confirmText={confirmModal?.confirmText}
+        cancelText={confirmModal?.cancelText}
+        variant={confirmModal?.variant}
+      />
     </div>
   );
 }

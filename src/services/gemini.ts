@@ -61,7 +61,7 @@ const cleanJsonOutput = (text: string): string => {
     // Find the first '{' and last '}' to extract JSON object
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
-    
+
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
@@ -100,11 +100,15 @@ export const tailorResume = async (currentResume: string, jobDescription: string
       - Quantify results where possible.
       - Return improvedExperience as an array with one entry per experience item. Use the experience item's 'id' field as experienceId.
       
+      8. **Extract Metadata**: Extract the official 'Job Title' and 'Company Name' from the text.
+      
       OUTPUT FORMAT:
       Return ONLY a valid JSON object with the following structure (no markdown, no explanations outside JSON):
       {
+        "company": "string",
+        "jobTitle": "string",
         "tailoredSummary": "string",
-        "missingHardSkills": ["string"],
+        "missingHardSkills": [{ "name": "string", "category": "string" }],
         "reasoning": "string",
         "improvedExperience": [
           {
@@ -147,8 +151,10 @@ export const tailorResume = async (currentResume: string, jobDescription: string
         }
 
         return {
+            company: parsed.company || 'Unknown Company',
+            jobTitle: parsed.jobTitle || 'Target Role',
             tailoredSummary: parsed.tailoredSummary,
-            missingHardSkills: parsed.missingHardSkills,
+            missingHardSkills: Array.isArray(parsed.missingHardSkills) ? parsed.missingHardSkills : [],
             reasoning: parsed.reasoning,
             improvedExperience: Array.isArray(parsed.improvedExperience) ? parsed.improvedExperience : [],
             projectSuggestions: Array.isArray(parsed.projectSuggestions) ? parsed.projectSuggestions : []

@@ -8,6 +8,8 @@
 // For solo implementer, we'll use IndexedDB (browser-based, free)
 // Can easily swap to MongoDB Atlas when scaling
 
+import type { Resume } from '../../types';
+
 export interface ApplicationRecord {
   id: string;
   userId: string;
@@ -28,6 +30,7 @@ export interface ApplicationRecord {
 
   // Resume used
   resumeVersion?: string;
+  resumeSnapshot?: Resume; // Full snapshot of the tailored resume
   coverLetter?: string;
 
   // Tracking
@@ -155,10 +158,10 @@ class JobSearchDatabase {
       const request = indexedDB.open(this.DB_NAME, this.VERSION);
 
       request.onerror = () => {
-          this.initPromise = null; // Reset on failure
-          reject(request.error);
+        this.initPromise = null; // Reset on failure
+        reject(request.error);
       };
-      
+
       request.onsuccess = () => {
         this.db = request.result;
         resolve();
@@ -200,7 +203,7 @@ class JobSearchDatabase {
         }
       };
     });
-    
+
     return this.initPromise;
   }
 
