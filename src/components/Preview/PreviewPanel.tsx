@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
 import { ModernTemplate } from './templates/ModernTemplate';
 import { ClassicTemplate } from './templates/ClassicTemplate';
-import { MinimalistTemplate } from './templates/MinimalistTemplate';
 import { Layout, Type } from 'lucide-react';
 
 export const PreviewPanel = () => {
@@ -32,7 +31,7 @@ export const PreviewPanel = () => {
                 return <ClassicTemplate resume={debouncedResume} />;
             case 'minimalist':
                 // Minimalist is currently broken, fallback to Modern for now or implement if fixed
-                return <MinimalistTemplate resume={debouncedResume} />;
+                return <ModernTemplate resume={debouncedResume} />;
             case 'modern':
             default:
                 return <ModernTemplate resume={debouncedResume} />;

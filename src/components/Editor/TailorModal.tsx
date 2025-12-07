@@ -261,7 +261,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                     name: proj.title,
                     description: proj.description,
                     technologies: proj.technologies,
-                    // bullets: [`Designed to demonstrate skills in: ${proj.technologies.join(', ')}`] // Removed as not used in display
+                    bullets: [] // Ensure bullets array is always present, even if empty
                 });
             });
         }
@@ -274,12 +274,15 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                 summary: tailoredSummary,
                 skills: newSkills,
                 experience: newExperience,
-                projects: newProjects
+                projects: newProjects,
+                // Explicitly reset tailoring state
+                isTailoring: false,
+                tailoringJob: undefined,
+                originalResume: null
             }
         });
 
         addToast('success', 'Changes applied to resume');
-        dispatch({ type: 'FINISH_TAILORING' });
     };
 
     return (

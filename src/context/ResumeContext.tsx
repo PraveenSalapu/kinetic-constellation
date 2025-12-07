@@ -30,7 +30,6 @@ type ResumeAction =
     | { type: 'SET_PAGE_SIZE'; payload: 'A4' | 'LETTER' }
     | { type: 'START_TAILORING'; payload?: { job?: { title: string; company: string; description: string; link?: string } } }
     | { type: 'DISCARD_TAILORING' }
-    | { type: 'FINISH_TAILORING' }
     | { type: 'APPLY_LAYOUT'; payload: Resume['layout'] }
     | { type: 'UNDO' }
     | { type: 'REDO' };
@@ -142,14 +141,6 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 tailoringJob: undefined,
                 originalResume: null
             } as ResumeState;
-
-        case 'FINISH_TAILORING':
-            return {
-                ...state,
-                isTailoring: false,
-                tailoringJob: undefined,
-                originalResume: null
-            };
 
         case 'APPLY_LAYOUT':
             console.log('APPLY_LAYOUT action triggered with:', action.payload);
