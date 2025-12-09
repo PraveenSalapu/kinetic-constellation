@@ -1,7 +1,9 @@
-import { Text, View } from '@react-pdf/renderer';
+import { Text, View, type Styles } from '@react-pdf/renderer';
 import type { Resume } from '../../types';
 
-export const renderPDFSection = (sectionId: string, resume: Resume, styles: any) => {
+type PDFStyles = Styles;
+
+export const renderPDFSection = (sectionId: string, resume: Resume, styles: PDFStyles) => {
     const baseFontSize = resume.layout?.fontSize || 10;
 
     switch (sectionId) {

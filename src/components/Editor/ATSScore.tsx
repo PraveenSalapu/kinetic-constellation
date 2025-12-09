@@ -98,6 +98,7 @@ export const ATSScore = () => {
             // Update skills
             if (missingHardSkills && missingHardSkills.length > 0) {
                 const existingTailoredSkills = resume.skills.find(s => s.category === 'Tailored Skills');
+                const missingSkillNames = missingHardSkills.map(skill => skill.name);
 
                 if (existingTailoredSkills) {
                     dispatch({
@@ -107,7 +108,7 @@ export const ATSScore = () => {
                             itemId: existingTailoredSkills.id,
                             item: {
                                 category: 'Tailored Skills',
-                                items: [...new Set([...existingTailoredSkills.items, ...missingHardSkills])]
+                                items: [...new Set([...existingTailoredSkills.items, ...missingSkillNames])]
                             }
                         }
                     });
@@ -119,7 +120,7 @@ export const ATSScore = () => {
                             item: {
                                 id: uuidv4(),
                                 category: 'Tailored Skills',
-                                items: missingHardSkills
+                                items: missingSkillNames
                             }
                         }
                     });
@@ -132,7 +133,7 @@ export const ATSScore = () => {
                     const existingExperience = resume.experience.find(e => e.id === experienceId);
                     if (!existingExperience) return;
 
-                    let newBullets = [...existingExperience.description];
+                    const newBullets = [...existingExperience.description];
 
                     // Apply revisions (Robust Matching)
                     revisedBullets.forEach(revision => {
@@ -390,7 +391,7 @@ export const ATSScore = () => {
                                                     key={idx}
                                                     className="px-3 py-1 bg-green-900/30 border border-green-700/50 rounded-full text-green-300 text-sm font-medium"
                                                 >
-                                                    {skill}
+                                                    {skill.name}
                                                 </span>
                                             ))}
                                         </div>

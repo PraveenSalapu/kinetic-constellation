@@ -45,8 +45,8 @@ export function useSection<T extends { id: string }>(sectionId: keyof Resume) {
     };
 
     // Update specific field in item
-    const updateField = (itemId: string, field: keyof T, value: any) => {
-        updateItem(itemId, { [field]: value } as Partial<T>);
+    const updateField = <K extends keyof T>(itemId: string, field: K, value: T[K]) => {
+        updateItem(itemId, { [field]: value } as unknown as Partial<T>);
     };
 
     return {

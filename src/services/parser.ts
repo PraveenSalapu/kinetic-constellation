@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
-import type { Resume } from '../types';
+import type { Resume, ExperienceItem, EducationItem, SkillGroup, ProjectItem, CertificationItem } from '../types';
 import { initialResume } from '../data/initialState';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -113,15 +113,15 @@ export const parseResumeWithAI = async (resumeText: string): Promise<Resume> => 
             ...initialResume,
             ...parsed,
             id: initialResume.id, // Keep original ID or generate new? createProfile handles ID.
-            experience: Array.isArray(parsed.experience) ? parsed.experience.map((e: any) => ({ ...e, id: uuidv4() })) : [],
-            education: Array.isArray(parsed.education) ? parsed.education.map((e: any) => ({ ...e, id: uuidv4() })) : [],
-            skills: Array.isArray(parsed.skills) ? parsed.skills.map((s: any) => ({ ...s, id: uuidv4() })) : [],
-            projects: Array.isArray(parsed.projects) ? parsed.projects.map((p: any) => ({
+            experience: Array.isArray(parsed.experience) ? parsed.experience.map((e: Partial<ExperienceItem>) => ({ ...e, id: uuidv4() } as ExperienceItem)) : [],
+            education: Array.isArray(parsed.education) ? parsed.education.map((e: Partial<EducationItem>) => ({ ...e, id: uuidv4() } as EducationItem)) : [],
+            skills: Array.isArray(parsed.skills) ? parsed.skills.map((s: Partial<SkillGroup>) => ({ ...s, id: uuidv4() } as SkillGroup)) : [],
+            projects: Array.isArray(parsed.projects) ? parsed.projects.map((p: Partial<ProjectItem>) => ({
                 ...p,
                 id: uuidv4(),
                 technologies: Array.isArray(p.technologies) ? p.technologies : []
-            })) : [],
-            certifications: Array.isArray(parsed.certifications) ? parsed.certifications.map((c: any) => ({ ...c, id: uuidv4() })) : [],
+            } as ProjectItem)) : [],
+            certifications: Array.isArray(parsed.certifications) ? parsed.certifications.map((c: Partial<CertificationItem>) => ({ ...c, id: uuidv4() } as CertificationItem)) : [],
         };
     } catch (error) {
         console.error('AI Parsing failed:', error);

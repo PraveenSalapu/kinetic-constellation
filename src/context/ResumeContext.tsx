@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import type { Resume, SectionConfig } from '../types';
+import type { Resume, SectionConfig, ExperienceItem, EducationItem, SkillGroup, ProjectItem, CertificationItem } from '../types';
 import { initialResume } from '../data/initialState';
 
 type ResumeState = Resume & {
@@ -20,9 +20,9 @@ type ResumeAction =
     | { type: 'SET_RESUME'; payload: Resume }
     | { type: 'UPDATE_PERSONAL_INFO'; payload: Partial<Resume['personalInfo']> }
     | { type: 'UPDATE_SUMMARY'; payload: string }
-    | { type: 'ADD_ITEM'; payload: { sectionId: keyof Resume; item: any } }
+    | { type: 'ADD_ITEM'; payload: { sectionId: keyof Resume; item: unknown } }
     | { type: 'DELETE_ITEM'; payload: { sectionId: keyof Resume; itemId: string } }
-    | { type: 'UPDATE_ITEM'; payload: { sectionId: keyof Resume; itemId: string; item: any } }
+    | { type: 'UPDATE_ITEM'; payload: { sectionId: keyof Resume; itemId: string; item: Partial<ExperienceItem | EducationItem | SkillGroup | ProjectItem | CertificationItem> } }
     | { type: 'REORDER_SECTIONS'; payload: SectionConfig[] }
     | { type: 'RESET_RESUME' }
     | { type: 'SET_TEMPLATE'; payload: 'modern' | 'classic' | 'minimalist' }
@@ -52,6 +52,7 @@ const saveToHistory = (state: ResumeState): ResumeState => {
     const newHistory = history.slice(0, historyIndex + 1);
 
     // Add current state to history (excluding history and historyIndex)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { history: _, historyIndex: __, ...stateToSave } = state;
     newHistory.push(stateToSave as ResumeState);
 
@@ -84,7 +85,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             newState = {
                 ...state,
                 [action.payload.sectionId]: [
-                    ...(state[action.payload.sectionId as keyof ResumeState] as any[]),
+                    ...(state[action.payload.sectionId as keyof ResumeState] as unknown[]),
                     action.payload.item,
                 ],
             };
@@ -93,7 +94,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
         case 'DELETE_ITEM':
             newState = {
                 ...state,
-                [action.payload.sectionId]: (state[action.payload.sectionId as keyof ResumeState] as any[]).filter(
+                [action.payload.sectionId]: (state[action.payload.sectionId as keyof ResumeState] as Array<{ id: string }>).filter(
                     (item) => item.id !== action.payload.itemId
                 ),
             };
@@ -102,7 +103,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
         case 'UPDATE_ITEM':
             newState = {
                 ...state,
-                [action.payload.sectionId]: (state[action.payload.sectionId as keyof ResumeState] as any[]).map((item) =>
+                [action.payload.sectionId]: (state[action.payload.sectionId as keyof ResumeState] as Array<{ id: string }>).map((item) =>
                     item.id === action.payload.itemId ? { ...item, ...action.payload.item } : item
                 ),
             };
@@ -139,7 +140,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 ...state.originalResume,
                 isTailoring: false,
                 tailoringJob: undefined,
-                originalResume: null
+                originalResume: undefined
             } as ResumeState;
 
         case 'APPLY_LAYOUT':
@@ -147,7 +148,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             newState = { ...state, layout: action.payload };
             return saveToHistory(newState);
 
-        case 'UNDO':
+        case 'UNDO': {
             const history = state.history || [];
             const historyIndex = state.historyIndex ?? -1;
 
@@ -160,8 +161,9 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 };
             }
             return state;
+        }
 
-        case 'REDO':
+        case 'REDO': {
             const historyRedo = state.history || [];
             const historyIndexRedo = state.historyIndex ?? -1;
 
@@ -174,6 +176,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 };
             }
             return state;
+        }
 
         default:
             return state;
@@ -195,7 +198,7 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
                 : initialResume.layout;
 
             // Migration: Ensure selectedTemplate exists
-            const migratedTemplate = (profileData as any).selectedTemplate || 'modern';
+            const migratedTemplate = (profileData as ResumeState).selectedTemplate || 'modern';
 
             return {
                 ...initialResume, // 1. Start with defaults to ensure structure

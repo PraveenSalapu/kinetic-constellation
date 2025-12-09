@@ -169,7 +169,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         const { tailoredSummary, missingHardSkills, improvedExperience, projectSuggestions } = tailorResult;
 
         // 1. Update Skills
-        let newSkills = [...resume.skills];
+        const newSkills = [...resume.skills];
         if (missingHardSkills && missingHardSkills.length > 0) {
             missingHardSkills.forEach(skill => {
                 // Find matching category (case-insensitive)
@@ -197,12 +197,12 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
 
         // 2. Update Experience
-        let newExperience = [...resume.experience];
+        const newExperience = [...resume.experience];
         if (improvedExperience && Array.isArray(improvedExperience)) {
             improvedExperience.forEach(update => {
                 const index = newExperience.findIndex(e => e.id === update.experienceId);
                 if (index !== -1) {
-                    let currentBullets = [...newExperience[index].description];
+                    const currentBullets = [...newExperience[index].description];
                     const selections = selectedImprovements.experience[update.experienceId];
 
                     // Apply revisions (if selected)
@@ -250,7 +250,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
 
         // 3. Add Projects
-        let newProjects = [...resume.projects];
+        const newProjects = [...resume.projects];
         if (projectSuggestions && selectedImprovements.projects.length > 0) {
             selectedImprovements.projects.forEach(index => {
                 const proj = projectSuggestions[index];

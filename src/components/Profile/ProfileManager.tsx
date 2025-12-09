@@ -43,8 +43,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
             try {
                 deleteProfile(id);
                 loadProfiles();
-            } catch (e: any) {
-                setError(e.message);
+            } catch (e) {
+                setError(e instanceof Error ? e.message : 'Failed to delete profile');
             }
         }
     };
@@ -75,8 +75,8 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
             setNewProfileName('');
             setResumeText('');
             onClose();
-        } catch (e: any) {
-            setError(e.message || 'Failed to create profile');
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to create profile');
         } finally {
             setIsParsing(false);
         }

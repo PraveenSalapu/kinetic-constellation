@@ -11,7 +11,6 @@ import { Certifications } from './sections/Certifications';
 import { CustomSection } from './sections/CustomSection';
 import { TailorModal } from './TailorModal';
 import { TrackApplicationModal } from './TrackApplicationModal';
-import { PostTailoringModal } from './PostTailoringModal';
 import { ATSScore } from './ATSScore';
 import { CoverLetterModal } from './CoverLetterModal';
 import { ProfileManager } from '../Profile/ProfileManager';
@@ -61,7 +60,6 @@ export const EditorPanel = () => {
         }
     }, []); // Run only on mount
     const [showTrackModal, setShowTrackModal] = useState(false);
-    const [showPostTailorModal, setShowPostTailorModal] = useState(false);
     const handleSaveApplication = async () => {
         if (!resume.tailoringJob) return;
 

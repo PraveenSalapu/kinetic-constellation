@@ -1,4 +1,4 @@
-import { Job } from '../components/Jobs/JobTable';
+import type { Job } from '../components/Jobs/JobTable';
 
 const JSEARCH_API_URL = 'https://jsearch.p.rapidapi.com/search';
 const JSEARCH_API_KEY = 'a813af95c9msh83b8f9b7cd4a46cp156515jsn2b8fedfbe4b9'; // Ideally use env var, but using per user request

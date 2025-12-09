@@ -1,5 +1,11 @@
 import { Type } from '@google/genai';
 import type { Tool } from './AgentCore';
+import type { Resume } from '../../types';
+
+interface SalaryRange {
+  min: number;
+  max: number;
+}
 
 // Web Search Tool (simulated - in production, integrate with real search API)
 export const webSearchTool: Tool = {
@@ -46,7 +52,7 @@ export const resumeAnalysisTool: Tool = {
     },
     required: ['resumeData']
   },
-  execute: async (params: { resumeData: any; focusAreas?: string[] }) => {
+  execute: async (params: { resumeData: Resume; focusAreas?: string[] }) => {
     const resume = params.resumeData;
     const analysis: {
       timestamp: string;
@@ -192,7 +198,7 @@ export const salaryResearchTool: Tool = {
   },
   execute: async (params: { jobTitle: string; location?: string; experienceLevel?: string }) => {
     // Simulated salary data (integrate with Glassdoor API, Levels.fyi, etc.)
-    const baseRanges: Record<string, any> = {
+    const baseRanges: Record<string, SalaryRange> = {
       entry: { min: 60000, max: 80000 },
       mid: { min: 80000, max: 120000 },
       senior: { min: 120000, max: 160000 },
@@ -278,7 +284,7 @@ export const contentGenerationTool: Tool = {
     },
     required: ['contentType', 'context']
   },
-  execute: async (params: { contentType: string; context: any; tone?: string }) => {
+  execute: async (params: { contentType: string; context: Record<string, unknown>; tone?: string }) => {
     // This would integrate with Gemini for actual generation
     return {
       contentType: params.contentType,
@@ -311,17 +317,19 @@ export const atsKeywordOptimizerTool: Tool = {
     required: ['originalText', 'targetKeywords']
   },
   execute: async (params: { originalText: string; targetKeywords: string[]; maxLength?: number }) => {
-    // Simple keyword injection (in production, use smarter NLP)
-    let optimized = params.originalText;
+    // TODO: Implement actual keyword optimization with AI
+    // This is a stub that identifies missing keywords but doesn't modify text
+    // In production, this would use Gemini to intelligently incorporate keywords
+    const originalText = params.originalText;
     const missingKeywords = params.targetKeywords.filter(
-      kw => !optimized.toLowerCase().includes(kw.toLowerCase())
+      kw => !originalText.toLowerCase().includes(kw.toLowerCase())
     );
 
     return {
       originalText: params.originalText,
-      optimizedText: optimized,
+      optimizedText: originalText, // TODO: Return actually optimized text when AI integration is complete
       addedKeywords: missingKeywords.slice(0, 3), // Add top 3 missing
-      keywordDensity: params.targetKeywords.length / optimized.split(' ').length,
+      keywordDensity: params.targetKeywords.length / originalText.split(' ').length,
       suggestions: missingKeywords.map(kw => `Consider adding "${kw}" naturally in context`),
       timestamp: new Date().toISOString()
     };
