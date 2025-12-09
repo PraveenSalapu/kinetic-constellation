@@ -140,7 +140,7 @@ export interface InsightRecord {
   actionable: boolean;
   actions?: string[];
   relatedApplications?: string[];
-  dataPoints: Record<string, any>;
+  dataPoints: Record<string, string | number | boolean>;
 }
 
 // IndexedDB wrapper (free, browser-based)

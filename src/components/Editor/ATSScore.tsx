@@ -98,6 +98,7 @@ export const ATSScore = () => {
             // Update skills
             if (missingHardSkills && missingHardSkills.length > 0) {
                 const existingTailoredSkills = resume.skills.find(s => s.category === 'Tailored Skills');
+                const missingSkillNames = missingHardSkills.map(skill => skill.name);
 
                 if (existingTailoredSkills) {
                     dispatch({
@@ -107,7 +108,7 @@ export const ATSScore = () => {
                             itemId: existingTailoredSkills.id,
                             item: {
                                 category: 'Tailored Skills',
-                                items: [...new Set([...existingTailoredSkills.items, ...missingHardSkills])]
+                                items: [...new Set([...existingTailoredSkills.items, ...missingSkillNames])]
                             }
                         }
                     });
@@ -119,7 +120,7 @@ export const ATSScore = () => {
                             item: {
                                 id: uuidv4(),
                                 category: 'Tailored Skills',
-                                items: missingHardSkills
+                                items: missingSkillNames
                             }
                         }
                     });

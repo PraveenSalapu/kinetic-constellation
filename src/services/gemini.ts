@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { Schema, Content } from '@google/genai';
-import type { TailorResponse, MatchScoreResponse } from '../types';
+import type { TailorResponse, MatchScoreResponse, Resume } from '../types';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -135,9 +135,9 @@ export const tailorResume = async (currentResume: string, jobDescription: string
         if (!text) throw new Error("No response from AI");
 
         // Parse and validate JSON
-        let parsed: any;
+        let parsed: Partial<TailorResponse> & { company?: string; jobTitle?: string };
         try {
-            parsed = JSON.parse(cleanJsonOutput(text));
+            parsed = JSON.parse(cleanJsonOutput(text)) as Partial<TailorResponse> & { company?: string; jobTitle?: string };
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             console.error('Raw response:', text);
@@ -165,7 +165,7 @@ export const tailorResume = async (currentResume: string, jobDescription: string
     }
 };
 
-export const calculateATSScore = async (resume: any, jobDescription: string): Promise<MatchScoreResponse> => {
+export const calculateATSScore = async (resume: Resume, jobDescription: string): Promise<MatchScoreResponse> => {
     if (!API_KEY) return { score: 0, missingKeywords: [], criticalFeedback: 'API Key missing' };
 
     try {
@@ -205,9 +205,9 @@ export const calculateATSScore = async (resume: any, jobDescription: string): Pr
         if (!text) throw new Error("No response from AI");
 
         // Parse and validate JSON
-        let parsed: any;
+        let parsed: MatchScoreResponse;
         try {
-            parsed = JSON.parse(cleanJsonOutput(text));
+            parsed = JSON.parse(cleanJsonOutput(text)) as MatchScoreResponse;
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError);
             console.error('Raw response:', text);
@@ -222,7 +222,7 @@ export const calculateATSScore = async (resume: any, jobDescription: string): Pr
 
         return {
             score: Math.min(100, Math.max(0, parsed.score)), // Clamp between 0-100
-            missingKeywords: parsed.missingKeywords.filter((k: any) => typeof k === 'string'), // Filter valid strings
+            missingKeywords: parsed.missingKeywords.filter((k): k is string => typeof k === 'string'), // Filter valid strings
             criticalFeedback: parsed.criticalFeedback
         } as MatchScoreResponse;
     } catch (error) {
@@ -231,7 +231,7 @@ export const calculateATSScore = async (resume: any, jobDescription: string): Pr
     }
 };
 
-export const chatWithCoach = async (message: string, resumeContext: any, history: any[]): Promise<string> => {
+export const chatWithCoach = async (message: string, resumeContext: Resume, history: Array<{ role: string; parts: Content['parts'] }>): Promise<string> => {
     if (!API_KEY) return "I'm offline right now. Please check your API key.";
 
     try {
@@ -263,7 +263,7 @@ export const chatWithCoach = async (message: string, resumeContext: any, history
     }
 };
 
-export const generateCoverLetter = async (resume: any, jobDescription: string): Promise<string> => {
+export const generateCoverLetter = async (resume: Resume, jobDescription: string): Promise<string> => {
     if (!API_KEY) return "API Key missing.";
 
     try {
