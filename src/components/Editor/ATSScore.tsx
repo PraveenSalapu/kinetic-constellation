@@ -133,7 +133,7 @@ export const ATSScore = () => {
                     const existingExperience = resume.experience.find(e => e.id === experienceId);
                     if (!existingExperience) return;
 
-                    let newBullets = [...existingExperience.description];
+                    const newBullets = [...existingExperience.description];
 
                     // Apply revisions (Robust Matching)
                     revisedBullets.forEach(revision => {
