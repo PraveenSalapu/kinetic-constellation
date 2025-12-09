@@ -10,7 +10,7 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
             try {
                 const typedarray = new Uint8Array(event.target?.result as ArrayBuffer);
 
-                // @ts-ignore
+                // @ts-expect-error - pdfjsLib is loaded via CDN and not typed
                 const pdf = await window.pdfjsLib.getDocument({ data: typedarray }).promise;
 
                 let fullText = "";
@@ -19,7 +19,7 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
 
-                    // @ts-ignore
+                    // @ts-expect-error - textContent.items is not fully typed
                     const pageText = textContent.items.map((item) => item.str).join(" ");
                     fullText += pageText + "\n";
                 }

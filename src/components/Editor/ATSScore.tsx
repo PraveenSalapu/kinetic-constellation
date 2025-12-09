@@ -390,7 +390,7 @@ export const ATSScore = () => {
                                                     key={idx}
                                                     className="px-3 py-1 bg-green-900/30 border border-green-700/50 rounded-full text-green-300 text-sm font-medium"
                                                 >
-                                                    {skill}
+                                                    {skill.name}
                                                 </span>
                                             ))}
                                         </div>

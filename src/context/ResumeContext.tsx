@@ -52,6 +52,7 @@ const saveToHistory = (state: ResumeState): ResumeState => {
     const newHistory = history.slice(0, historyIndex + 1);
 
     // Add current state to history (excluding history and historyIndex)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { history: _, historyIndex: __, ...stateToSave } = state;
     newHistory.push(stateToSave as ResumeState);
 
@@ -139,7 +140,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 ...state.originalResume,
                 isTailoring: false,
                 tailoringJob: undefined,
-                originalResume: null
+                originalResume: undefined
             } as ResumeState;
 
         case 'APPLY_LAYOUT':
@@ -147,7 +148,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             newState = { ...state, layout: action.payload };
             return saveToHistory(newState);
 
-        case 'UNDO':
+        case 'UNDO': {
             const history = state.history || [];
             const historyIndex = state.historyIndex ?? -1;
 
@@ -160,8 +161,9 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 };
             }
             return state;
+        }
 
-        case 'REDO':
+        case 'REDO': {
             const historyRedo = state.history || [];
             const historyIndexRedo = state.historyIndex ?? -1;
 
@@ -174,6 +176,7 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 };
             }
             return state;
+        }
 
         default:
             return state;

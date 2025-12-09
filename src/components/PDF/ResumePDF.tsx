@@ -2,7 +2,6 @@ import { Document, Font } from '@react-pdf/renderer';
 import type { Resume } from '../../types';
 import { ModernPDF } from './templates/ModernPDF';
 import { ClassicPDF } from './templates/ClassicPDF';
-import { MinimalistPDF } from './templates/MinimalistPDF';
 
 // Register custom fonts
 Font.register({

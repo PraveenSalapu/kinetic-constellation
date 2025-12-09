@@ -312,7 +312,7 @@ export const atsKeywordOptimizerTool: Tool = {
   },
   execute: async (params: { originalText: string; targetKeywords: string[]; maxLength?: number }) => {
     // Simple keyword injection (in production, use smarter NLP)
-    let optimized = params.originalText;
+    const optimized = params.originalText;
     const missingKeywords = params.targetKeywords.filter(
       kw => !optimized.toLowerCase().includes(kw.toLowerCase())
     );
