@@ -1,0 +1,8 @@
+/* Content script styles - kept minimal since we use Shadow DOM */
+/* This file is mostly for any global overrides if needed */
+
+#careerflow-widget-host,
+#careerflow-modal-host {
+  /* Ensure our elements are always on top */
+  z-index: 2147483647 !important;
+}

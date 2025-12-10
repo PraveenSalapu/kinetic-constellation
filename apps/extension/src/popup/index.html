@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerFlow</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 320px;
+      min-height: 400px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #111827;
+      color: #f3f4f6;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* Login Form */
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .form-group input {
+      padding: 12px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      color: #f3f4f6;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: #667eea;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #374151;
+      color: #f3f4f6;
+    }
+
+    .error-message {
+      background: #7f1d1d;
+      color: #fecaca;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* Logged in view */
+    .logged-in {
+      text-align: center;
+    }
+
+    .user-info {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .user-avatar {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .user-email {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .status-card {
+      background: #1f2937;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .status-title {
+      font-size: 13px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+
+    .status-value {
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    .register-link {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .register-link a {
+      color: #667eea;
+      text-decoration: none;
+    }
+
+    .register-link a:hover {
+      text-decoration: underline;
+    }
+
+    /* Loading state */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #374151;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">⚡ CareerFlow</div>
+      <div class="subtitle">AI-Powered Resume Auto-Fill</div>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div id="login-view" style="display: none;">
+      <form class="login-form" id="login-form">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="••••••••" required>
+        </div>
+
+        <div id="error-container" class="error-message" style="display: none;"></div>
+
+        <button type="submit" class="btn btn-primary" id="login-btn">
+          Sign In
+        </button>
+      </form>
+
+      <div class="register-link">
+        Don't have an account? <a href="http://localhost:5174/register" target="_blank">Sign up</a>
+      </div>
+    </div>
+
+    <div id="logged-in-view" class="logged-in" style="display: none;">
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">U</div>
+        <div class="user-email" id="user-email">user@example.com</div>
+      </div>
+
+      <div class="status-card">
+        <div class="status-title">Extension Status</div>
+        <div class="status-value">
+          <span class="status-dot"></span>
+          <span>Active & Ready</span>
+        </div>
+      </div>
+
+      <div class="status-card">
+        <div class="status-title">How to use</div>
+        <div style="font-size: 13px; color: #9ca3af; line-height: 1.6;">
+          1. Navigate to a job posting<br>
+          2. Click the CareerFlow button<br>
+          3. Select your profile and auto-fill!
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="create-profile-btn" style="width: 100%; margin-bottom: 12px; display: none;">
+        Create Default Profile
+      </button>
+
+      <button class="btn btn-secondary" id="logout-btn" style="width: 100%;">
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <script src="./popup.js" type="module"></script>
+</body>
+</html>

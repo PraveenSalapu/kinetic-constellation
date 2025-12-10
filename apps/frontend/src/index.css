@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Forensic Dark Mode Color System */
+  --color-background: #050505;
+  --color-surface: #111111;
+  --color-border: #1F2937;
+  --color-text: #E5E7EB;
+  --color-text-secondary: #9CA3AF;
+  --color-text-muted: #6B7280;
+
+  /* Brand Colors - Mission Control Indigo */
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-primary-light: #312E81;
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Times New Roman', Times, serif;
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  /* Resume Fonts */
+  --font-resume-professional: 'Times New Roman', Times, serif;
+  --font-resume-modern: 'Inter', system-ui, sans-serif;
+  --font-resume-technical: 'Consolas', 'Monaco', monospace;
+
+  /* Shadows - Dark Mode Optimized */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-text antialiased;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-text font-semibold;
+    letter-spacing: -0.01em;
+  }
+
+  input, textarea, select {
+    font-family: var(--font-sans);
+  }
+
+  code, pre {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  /* Primary Button */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-primary text-white font-medium rounded-lg transition-all duration-200 hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-[#1a1a1a] text-text border border-border font-medium rounded-lg transition-all duration-200 hover:bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-secondary:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .btn-icon {
+    @apply p-2 bg-[#1a1a1a] border border-border rounded-lg text-text-secondary transition-all duration-200 hover:bg-surface hover:border-primary hover:text-primary;
+  }
+
+  /* Card Panels */
+  .card {
+    @apply bg-surface border border-border rounded-xl relative;
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  /* Input Fields - Consistent Across All */
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-[#1a1a1a] border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary;
+  }
+
+  .input-field:hover:not(:focus) {
+    @apply border-text-secondary;
+  }
+
+  .textarea-field {
+    @apply w-full px-4 py-2.5 bg-[#1a1a1a] border border-border rounded-lg text-text placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-[80px] resize-y;
+  }
+
+  .textarea-field:hover:not(:focus) {
+    @apply border-text-secondary;
+  }
+
+  .label-field {
+    @apply block text-sm font-medium text-text-secondary mb-1.5;
+  }
+
+  .label-optional {
+    @apply text-text-muted font-normal;
+  }
+
+  /* Section Header */
+  .section-header {
+    @apply flex items-center justify-between pb-4 mb-6 border-b border-border;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-text flex items-center gap-2;
+  }
+
+  /* Badge Components */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary-light text-indigo-300;
+  }
+
+  .badge-success {
+    @apply bg-success/10 text-success;
+  }
+
+  .badge-warning {
+    @apply bg-warning/10 text-warning;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-secondary;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-border my-6;
+  }
+}
+
+@layer utilities {
+  /* Animation Utilities */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+}

@@ -7,6 +7,7 @@ import { getDatabase } from '../../services/database/mongodb';
 import { v4 } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import ErrorBoundary from '../ErrorBoundary';
+import { useActiveTab } from '../../hooks/useActiveTab';
 
 interface TailorModalProps {
     isOpen: boolean;
@@ -17,6 +18,7 @@ interface TailorModalProps {
 export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }: TailorModalProps) => {
     const { resume, dispatch } = useResume();
     const { addToast } = useToast();
+    const { extractJobDescription, loading: loadingJob } = useActiveTab();
     const [jobDescription, setJobDescription] = useState(initialJD);
     const [isTailoring, setIsTailoring] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -313,8 +315,26 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                         {!tailorResult ? (
                             <>
                                 <p className="text-gray-400">
-                                    Paste the job description below. Gemini AI will analyze it and suggest improvements to your summary and identify missing skills.
+                                    Paste the job description below or import from the active tab.
                                 </p>
+
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        onClick={async () => {
+                                            const data = await extractJobDescription();
+                                            if (data) {
+                                                const formatted = `Role: ${data.title}\nCompany: ${data.company}\nLink: ${data.link}\n\nJob Description:\n${data.description}`;
+                                                setJobDescription(formatted);
+                                                // Optional: Update resume context if needed, but local state is fine for analysis
+                                            }
+                                        }}
+                                        disabled={loadingJob}
+                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-900/40 text-indigo-300 rounded-lg hover:bg-indigo-900/60 transition-colors text-sm font-medium border border-indigo-500/30"
+                                    >
+                                        {loadingJob ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />}
+                                        Import from Active Tab
+                                    </button>
+                                </div>
 
                                 <textarea
                                     value={jobDescription}
