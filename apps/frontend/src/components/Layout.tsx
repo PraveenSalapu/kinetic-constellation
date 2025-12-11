@@ -1,17 +1,18 @@
 
 import { useState, useEffect } from 'react';
-import { Bot, BarChart3, Briefcase, FileText, CheckSquare, LayoutDashboard, Settings } from 'lucide-react';
+import { Bot, BarChart3, Briefcase, FileText, CheckSquare, LayoutDashboard, Settings, User } from 'lucide-react';
 import { EditorPanel } from './Editor/EditorPanel';
 import { PreviewPanel } from './Preview/PreviewPanel';
 import { AgentWorkspace } from './Agent/AgentWorkspace';
 import { AnalyticsDashboard } from './Analytics/AnalyticsDashboard';
 import { ApplicationTracker } from './Analytics/ApplicationTracker';
 import { JobTable } from './Jobs/JobTable';
+import { ProfilePage } from './Profile/ProfilePage';
 import { useResume } from '../context/ResumeContext';
 import { SettingsModal } from './Settings/SettingsModal';
 import { useSearchParams } from 'react-router-dom';
 
-type ViewMode = 'editor' | 'agents' | 'analytics' | 'tracker' | 'jobs';
+type ViewMode = 'editor' | 'agents' | 'analytics' | 'tracker' | 'jobs' | 'profile';
 
 export const Layout = () => {
     const [viewMode, setViewMode] = useState<ViewMode>('editor');
@@ -72,6 +73,8 @@ export const Layout = () => {
                 return <ApplicationTracker userId={userId} />;
             case 'jobs':
                 return <JobTable />;
+            case 'profile':
+                return <ProfilePage />;
             case 'agents':
                 return (
                     <div className="flex h-full w-full">
@@ -137,8 +140,17 @@ export const Layout = () => {
                     >
                         <Settings size={20} />
                     </button>
-                    {/* User Avatar Placeholder */}
-                    <div className="w-8 h-8 rounded-full bg-gray-700 border border-gray-600"></div>
+                    {/* User Profile Button */}
+                    <button
+                        onClick={() => setViewMode('profile')}
+                        className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${viewMode === 'profile'
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                            : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white'
+                            }`}
+                        title="Profile"
+                    >
+                        <User size={16} />
+                    </button>
                 </div>
             </div>
 

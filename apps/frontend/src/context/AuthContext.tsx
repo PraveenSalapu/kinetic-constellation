@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import * as api from '../services/api';
+import { supabase } from '../services/supabase';
 import { syncProfilesFromApi } from '../services/storage';
 
 interface User {
   id: string;
-  email: string;
+  email?: string;
 }
 
 interface AuthContextType {
@@ -24,36 +24,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = api.getAccessToken();
-
-    if (storedUser && token) {
-      try {
-        setUser(JSON.parse(storedUser));
-        // Sync profiles from API on app load if authenticated
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+      if (session?.user) {
         syncProfilesFromApi().catch(console.error);
-      } catch {
-        api.clearTokens();
       }
-    }
-    setIsLoading(false);
+    });
+
+    // Listen for changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await api.login(email, password);
-    setUser(response.user);
-    // Sync profiles after login
-    await syncProfilesFromApi();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   };
 
   const register = async (email: string, password: string) => {
-    const response = await api.register(email, password);
-    setUser(response.user);
-    // New user - no profiles to sync yet
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
   };
 
   const logout = async () => {
-    await api.logout();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     setUser(null);
   };
 

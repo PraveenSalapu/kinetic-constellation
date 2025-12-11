@@ -14,10 +14,16 @@ type ResumeState = Resume & {
     originalResume?: Resume | null;
     history?: ResumeState[];
     historyIndex?: number;
+    atsScan?: {
+        score: number;
+        issues: { type: 'error' | 'warning' | 'success'; message: string }[];
+        missingKeywords: string[];
+    };
 };
 
 type ResumeAction =
     | { type: 'SET_RESUME'; payload: Resume }
+    | { type: 'SET_SCAN_RESULTS'; payload: ResumeState['atsScan'] }
     | { type: 'UPDATE_PERSONAL_INFO'; payload: Partial<Resume['personalInfo']> }
     | { type: 'UPDATE_SUMMARY'; payload: string }
     | { type: 'ADD_ITEM'; payload: { sectionId: keyof Resume; item: any } }
@@ -31,6 +37,7 @@ type ResumeAction =
     | { type: 'START_TAILORING'; payload?: { job?: { title: string; company: string; description: string; link?: string } } }
     | { type: 'DISCARD_TAILORING' }
     | { type: 'APPLY_LAYOUT'; payload: Resume['layout'] }
+    | { type: 'UPDATE_DEMOGRAPHICS'; payload: Partial<Resume['demographics']> }
     | { type: 'UNDO' }
     | { type: 'REDO' };
 
@@ -71,6 +78,9 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
     switch (action.type) {
         case 'SET_RESUME':
             return { ...state, ...action.payload };
+
+        case 'SET_SCAN_RESULTS':
+            return { ...state, atsScan: action.payload };
 
         case 'UPDATE_PERSONAL_INFO':
             newState = { ...state, personalInfo: { ...state.personalInfo, ...action.payload } };
@@ -139,12 +149,19 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
                 ...state.originalResume,
                 isTailoring: false,
                 tailoringJob: undefined,
-                originalResume: null
+                originalResume: undefined
             } as ResumeState;
 
         case 'APPLY_LAYOUT':
             console.log('APPLY_LAYOUT action triggered with:', action.payload);
             newState = { ...state, layout: action.payload };
+            return saveToHistory(newState);
+
+        case 'UPDATE_DEMOGRAPHICS':
+            newState = {
+                ...state,
+                demographics: { ...state.demographics, ...action.payload }
+            };
             return saveToHistory(newState);
 
         case 'UNDO':

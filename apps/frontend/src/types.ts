@@ -15,6 +15,21 @@ export type EducationItem = Resume['education'][number];
 export type ProjectItem = Resume['projects'][number];
 export type CertificationItem = Resume['certifications'][number];
 
+export interface Demographics {
+    gender?: string;
+    race?: string;
+    veteranStatus?: string;
+    disabilityStatus?: string;
+    workAuthorization?: string;
+    requiresSponsorship?: boolean;
+}
+
+export interface AtsScan {
+    score: number;
+    issues: { type: 'error' | 'warning' | 'success'; message: string }[];
+    missingKeywords: string[];
+}
+
 export interface Resume {
     id: string;
     title: string;
@@ -97,6 +112,8 @@ export interface Resume {
         link?: string;
     };
     originalResume?: Resume;
+    demographics?: Demographics;
+    atsScan?: AtsScan;
 }
 
 export interface UserProfile {

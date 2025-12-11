@@ -15,6 +15,17 @@ export type EducationItem = Resume['education'][number];
 export type ProjectItem = Resume['projects'][number];
 export type CertificationItem = Resume['certifications'][number];
 
+
+export interface Demographics {
+    gender?: string;
+    race?: string;
+    veteranStatus?: string;
+    disabilityStatus?: string;
+    citizenship?: string;
+    workAuthorization?: string; // e.g., "Authorized to work in US"
+    requiresSponsorship?: boolean;
+}
+
 export interface Resume {
     id: string;
     title: string;
@@ -97,6 +108,7 @@ export interface Resume {
         link?: string;
     };
     originalResume?: Resume;
+    demographics?: Demographics;
 }
 
 export interface UserProfile {

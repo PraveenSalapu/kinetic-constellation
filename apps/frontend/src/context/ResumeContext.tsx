@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import type { Resume, SectionConfig } from '../types';
+import type { Resume, SectionConfig, Demographics, AtsScan } from '../types';
 import { initialResume } from '../data/initialState';
 
 type ResumeState = Resume & {
@@ -31,6 +31,8 @@ type ResumeAction =
     | { type: 'START_TAILORING'; payload?: { job?: { title: string; company: string; description: string; link?: string } } }
     | { type: 'DISCARD_TAILORING' }
     | { type: 'APPLY_LAYOUT'; payload: Resume['layout'] }
+    | { type: 'SET_SCAN_RESULTS'; payload: AtsScan }
+    | { type: 'UPDATE_DEMOGRAPHICS'; payload: Demographics }
     | { type: 'UNDO' }
     | { type: 'REDO' };
 
@@ -147,6 +149,14 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             newState = { ...state, layout: action.payload };
             return saveToHistory(newState);
 
+        case 'SET_SCAN_RESULTS':
+            newState = { ...state, atsScan: action.payload };
+            return saveToHistory(newState);
+
+        case 'UPDATE_DEMOGRAPHICS':
+            newState = { ...state, demographics: action.payload };
+            return saveToHistory(newState);
+
         case 'UNDO':
             const history = state.history || [];
             const historyIndex = state.historyIndex ?? -1;
@@ -186,11 +196,11 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
     const [resume, dispatch] = useReducer(resumeReducer, initialResume, () => {
         // Optimistic initialization from local storage for instant render
         try {
-             // Fallback to initial if local is empty or error
-            const activeProfile = getActiveProfileSync(); 
+            // Fallback to initial if local is empty or error
+            const activeProfile = getActiveProfileSync();
             const profileData = activeProfile.data;
 
-             const migratedLayout = profileData.layout && typeof profileData.layout.fontSize === 'number'
+            const migratedLayout = profileData.layout && typeof profileData.layout.fontSize === 'number'
                 ? profileData.layout
                 : initialResume.layout;
 
@@ -210,20 +220,20 @@ export const ResumeProvider = ({ children }: { children: ReactNode }) => {
     // Hydrate from API if authenticated
     useEffect(() => {
         const hydrate = async () => {
-             const token = localStorage.getItem('accessToken');
-             if (token) {
-                 try {
-                     const apiProfile = await getProfileFromApi();
-                     if (apiProfile) {
-                         const profileData = apiProfile.data;
-                         // Check if API data is different/newer? 
-                         // For now, let's assume API is source of truth on load
-                         dispatch({ type: 'SET_RESUME', payload: profileData });
-                     }
-                 } catch (e) {
-                     console.error("Failed to hydrate from API", e);
-                 }
-             }
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                try {
+                    const apiProfile = await getProfileFromApi();
+                    if (apiProfile) {
+                        const profileData = apiProfile.data;
+                        // Check if API data is different/newer? 
+                        // For now, let's assume API is source of truth on load
+                        dispatch({ type: 'SET_RESUME', payload: profileData });
+                    }
+                } catch (e) {
+                    console.error("Failed to hydrate from API", e);
+                }
+            }
         };
         hydrate();
     }, []);

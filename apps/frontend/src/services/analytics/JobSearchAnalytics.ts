@@ -3,7 +3,8 @@
  * Provides recruiter-level insights and metrics for job seekers
  */
 
-import { getDatabase, type ApplicationRecord, type AnalyticsRecord } from '../database/mongodb';
+// import { getDatabase, type ApplicationRecord, type AnalyticsRecord } from '../database/mongodb';
+import type { ApplicationRecord } from '../apiApplication';
 import { GoogleGenAI } from '@google/genai';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -37,18 +38,18 @@ export interface MarketInsight {
 }
 
 export class JobSearchAnalytics {
-  private db = getDatabase();
-  private userId: string;
+  // private db = getDatabase(); // Removed local DB dependency
+  // private userId: string;
 
-  constructor(userId: string) {
-    this.userId = userId;
+  constructor(_userId: string) {
+    // this.userId = userId;
   }
 
   /**
    * Calculate comprehensive application metrics
    */
-  async calculateMetrics(): Promise<ApplicationMetrics> {
-    const applications = await this.db.getAllApplications(this.userId);
+  async calculateMetrics(applications: ApplicationRecord[]): Promise<ApplicationMetrics> {
+    // const applications = await this.db.getAllApplications(this.userId);
 
     const total = applications.length;
     const active = applications.filter(a =>
@@ -56,6 +57,7 @@ export class JobSearchAnalytics {
     ).length;
 
     const applied = applications.filter(a => a.appliedDate).length;
+
     const responded = applications.filter(a =>
       ['screening', 'interviewing', 'offer', 'rejected'].includes(a.status)
     ).length;
@@ -105,8 +107,8 @@ export class JobSearchAnalytics {
   /**
    * Identify success patterns using AI analysis
    */
-  async identifySuccessPatterns(): Promise<SuccessPattern[]> {
-    const applications = await this.db.getAllApplications(this.userId);
+  async identifySuccessPatterns(applications: ApplicationRecord[]): Promise<SuccessPattern[]> {
+    // const applications = await this.db.getAllApplications(this.userId);
 
     const successful = applications.filter(a =>
       ['offer', 'accepted'].includes(a.status)
@@ -177,8 +179,8 @@ Output JSON:
   /**
    * Generate AI-powered market insights
    */
-  async generateMarketInsights(): Promise<MarketInsight[]> {
-    const applications = await this.db.getAllApplications(this.userId);
+  async generateMarketInsights(applications: ApplicationRecord[]): Promise<MarketInsight[]> {
+    // const applications = await this.db.getAllApplications(this.userId);
 
     if (applications.length < 3) {
       return [{
@@ -252,9 +254,9 @@ Output JSON:
   /**
    * Get personalized recommendations
    */
-  async getRecommendations(): Promise<string[]> {
-    const metrics = await this.calculateMetrics();
-    const applications = await this.db.getAllApplications(this.userId);
+  async getRecommendations(applications: ApplicationRecord[]): Promise<string[]> {
+    const metrics = await this.calculateMetrics(applications);
+    // const applications = await this.db.getAllApplications(this.userId);
     const recommendations: string[] = [];
 
     // Response rate analysis
@@ -319,22 +321,22 @@ Output JSON:
   /**
    * Generate weekly summary report
    */
-  async generateWeeklySummary(): Promise<{
+  async generateWeeklySummary(applications: ApplicationRecord[]): Promise<{
     period: string;
     metrics: ApplicationMetrics;
     highlights: string[];
     actions: string[];
     insights: MarketInsight[];
   }> {
-    const metrics = await this.calculateMetrics();
-    const recommendations = await this.getRecommendations();
-    const insights = await this.generateMarketInsights();
+    const metrics = await this.calculateMetrics(applications);
+    const recommendations = await this.getRecommendations(applications);
+    const insights = await this.generateMarketInsights(applications);
 
     // Get this week's applications
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const applications = await this.db.getAllApplications(this.userId);
+    // const applications = await this.db.getAllApplications(this.userId);
     const thisWeek = applications.filter(a =>
       a.lastUpdated >= oneWeekAgo
     );
@@ -374,57 +376,12 @@ Output JSON:
 
   /**
    * Save current analytics snapshot
+   * (Disabled during cloud migration - requires backend analytics endpoint)
    */
-  async saveAnalyticsSnapshot(period: 'daily' | 'weekly' | 'monthly'): Promise<void> {
-    const metrics = await this.calculateMetrics();
-    const applications = await this.db.getAllApplications(this.userId);
-
-    // Calculate breakdowns
-    const byIndustry: Record<string, number> = {};
-    const byRole: Record<string, number> = {};
-    const byCompanySize: Record<string, number> = {};
-    const bySource: Record<string, number> = {};
-
-    applications.forEach(app => {
-      // Count by role
-      byRole[app.jobTitle] = (byRole[app.jobTitle] || 0) + 1;
-
-      // Count by source
-      bySource[app.source] = (bySource[app.source] || 0) + 1;
-    });
-
-    const analyticsRecord: AnalyticsRecord = {
-      id: `analytics_${this.userId}_${period}_${Date.now()}`,
-      userId: this.userId,
-      period,
-      date: new Date(),
-      metrics: {
-        totalApplications: metrics.total,
-        newApplications: 0, // Would track delta
-        responseRate: metrics.responseRate,
-        interviewRate: metrics.interviewRate,
-        offerRate: metrics.offerRate,
-        avgResponseTime: metrics.avgResponseTime,
-        avgTimeToInterview: 0,
-        avgTimeToOffer: metrics.avgTimeToOffer,
-        totalOffers: applications.filter(a => a.status === 'offer').length,
-        totalRejections: applications.filter(a => a.status === 'rejected').length,
-        totalWithdrawn: applications.filter(a => a.status === 'withdrawn').length,
-        acceptanceRate: 0,
-        resumeOptimizations: 0,
-        coverLettersGenerated: 0,
-        interviewPreps: 0,
-        agentInteractions: 0
-      },
-      breakdowns: {
-        byIndustry,
-        byRole,
-        byCompanySize,
-        bySource
-      }
-    };
-
-    await this.db.saveAnalytics(analyticsRecord);
+  async saveAnalyticsSnapshot(_period: 'daily' | 'weekly' | 'monthly', _applications: ApplicationRecord[]): Promise<void> {
+    // Logic disabled to remove local DB dependency
+    // TODO: Implement API-based analytics saving
+    console.warn('Analytics saving not yet implemented for cloud storage');
   }
 }
 

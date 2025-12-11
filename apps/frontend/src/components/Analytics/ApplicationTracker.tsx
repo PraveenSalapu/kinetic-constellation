@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, X, Edit2, Save, Calendar, Briefcase, MapPin, Link as LinkIcon, Download } from 'lucide-react';
 import { ConfirmModal } from '../UI/ConfirmModal';
-import { getDatabase, type ApplicationRecord } from '../../services/database/mongodb';
+import * as api from '../../services/apiApplication';
+import type { ApplicationRecord } from '../../services/database/mongodb'; // Still use types from there for now
 import { v4 as uuidv4 } from 'uuid';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
@@ -53,7 +54,7 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
     notes: '',
   });
 
-  const db = getDatabase();
+
 
   useEffect(() => {
     loadApplications();
@@ -62,8 +63,8 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
   const loadApplications = async () => {
     setLoading(true);
     try {
-      await db.initialize();
-      const apps = await db.getAllApplications(userId);
+      // Use API instead of local DB
+      const apps = await api.getApplications();
       setApplications(apps.sort((a, b) => {
         const dateA = a.appliedDate ? new Date(a.appliedDate).getTime() : 0;
         const dateB = b.appliedDate ? new Date(b.appliedDate).getTime() : 0;
@@ -88,7 +89,7 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
       };
 
       if (editingId) {
-        await db.updateApplication(editingId, updatedData);
+        await api.updateApplication(editingId, updatedData);
       } else {
         const newApp: ApplicationRecord = {
           id: uuidv4(),
@@ -108,7 +109,7 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
           notes: notes || '',
           lastUpdated: new Date(),
         };
-        await db.createApplication(newApp);
+        await api.createApplication(newApp);
       }
 
       await loadApplications();
@@ -142,7 +143,7 @@ export function ApplicationTracker({ userId }: ApplicationTrackerProps) {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          await db.deleteApplication(id);
+          await api.deleteApplication(id);
           await loadApplications();
         } catch (error) {
           console.error('Error deleting application:', error);

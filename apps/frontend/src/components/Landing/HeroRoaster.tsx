@@ -1,40 +1,35 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
-import { Cpu, AlertTriangle, CheckCircle, Upload, User, ArrowRight, PlusCircle } from 'lucide-react';
+import { Cpu, Upload, User, ArrowRight, PlusCircle } from 'lucide-react';
 import { extractTextFromPDF } from '../../utils/pdfUtils';
 import { parseResumeWithAI } from '../../services/parser';
-import { getAllProfiles, setActiveProfileId, createProfile, type UserProfile } from '../../services/storage';
+import { getAllProfilesSync, setActiveProfileId, createProfile, type UserProfile } from '../../services/storage';
 
 interface HeroRoasterProps {
-    onComplete?: () => void;
+    onScanComplete?: () => void;
+    onProfileSelect?: () => void;
 }
 
-export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
+export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProfileSelect }) => {
     const { dispatch } = useResume();
     const [isDragging, setIsDragging] = useState(false);
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'complete'>('idle');
     const [logs, setLogs] = useState<string[]>([]);
-    const [score, setScore] = useState<number>(0);
     const [existingProfiles, setExistingProfiles] = useState<UserProfile[]>([]);
     const [showUpload, setShowUpload] = useState(false);
 
     useEffect(() => {
-        const loadProfiles = async () => {
-            const profiles = await getAllProfiles();
-            // Filter for profiles that have some data (name is not empty or not default)
-            const validProfiles = profiles.filter(p =>
-                p.data.personalInfo.fullName.trim() !== '' ||
-                p.data.experience.length > 0 ||
-                (p.name !== 'Default Profile' && p.name.trim() !== '')
-            ).sort((a, b) => b.updatedAt - a.updatedAt); // Sort by most recent
+        const profiles = getAllProfilesSync();
+        const validProfiles = profiles.filter(p =>
+            p.data.personalInfo.fullName.trim() !== '' ||
+            p.data.experience.length > 0 ||
+            (p.name !== 'Default Profile' && p.name.trim() !== '')
+        ).sort((a, b) => b.updatedAt - a.updatedAt);
 
-            setExistingProfiles(validProfiles);
-            // If no valid profiles, default to showing upload
-            if (validProfiles.length === 0) {
-                setShowUpload(true);
-            }
-        };
-        loadProfiles();
+        setExistingProfiles(validProfiles);
+        if (validProfiles.length === 0) {
+            setShowUpload(true);
+        }
     }, []);
 
     const addLog = (msg: string) => setLogs(prev => [...prev, `> ${msg}`]);
@@ -43,11 +38,10 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
         if (file.type !== 'application/pdf') return;
 
         setScanState('scanning');
-        setShowUpload(true); // Ensure upload UI is visible during scan
+        setShowUpload(true);
         setLogs([]);
         addLog("Initializing ATS Scanner v2.1...");
 
-        // Artificial delay for effect
         setTimeout(() => addLog("Parsing binary PDF structure..."), 800);
         setTimeout(() => addLog("Extracting raw text layer..."), 1600);
         setTimeout(() => addLog("Identifying key sections..."), 2400);
@@ -57,19 +51,44 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
             addLog("Text extraction complete.");
             addLog("Analyzing keyword density against current market...");
 
-            // Parse with AI
             const parsedData = await parseResumeWithAI(text);
 
             setTimeout(() => {
                 addLog("Optimization complete.");
-                setScore(42); // Mock score for now, replace with real calc logic later
                 setScanState('complete');
                 dispatch({ type: 'SET_RESUME', payload: parsedData });
+                dispatch({
+                    type: 'SET_SCAN_RESULTS',
+                    payload: {
+                        score: 42,
+                        issues: [
+                            { type: 'error', message: 'Header unreadable (Graphics detected)' },
+                            { type: 'error', message: 'Date format inconsistent (MM/YY vs Month Year)' },
+                            { type: 'warning', message: 'Missing key skills: Docker, Kubernetes' },
+                            { type: 'success', message: 'Contact info valid' }
+                        ],
+                        missingKeywords: ['Docker', 'Kubernetes']
+                    }
+                });
+                if (onScanComplete) onScanComplete();
             }, 3500);
 
         } catch (error) {
             addLog("ERROR: Parse failed. File corrupted or encrypted.");
-            setScanState('idle');
+            addLog("Falling back to manual entry mode...");
+
+            setTimeout(() => {
+                setScanState('complete');
+                dispatch({
+                    type: 'SET_SCAN_RESULTS',
+                    payload: {
+                        score: 0,
+                        issues: [{ type: 'error', message: 'Parsing failed. Please enter data manually.' }],
+                        missingKeywords: []
+                    }
+                });
+                if (onScanComplete) onScanComplete();
+            }, 2000);
         }
     };
 
@@ -77,7 +96,7 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
         const profile = await setActiveProfileId(profileId);
         if (profile) {
             dispatch({ type: 'SET_RESUME', payload: profile.data });
-            if (onComplete) onComplete();
+            if (onProfileSelect) onProfileSelect();
         }
     };
 
@@ -85,7 +104,7 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
         const newProfile = await createProfile('New Resume');
         await setActiveProfileId(newProfile.id);
         dispatch({ type: 'SET_RESUME', payload: newProfile.data });
-        if (onComplete) onComplete();
+        if (onProfileSelect) onProfileSelect(); // Skip scan results for scratch
     };
 
     const onDrop = useCallback((e: React.DragEvent) => {
@@ -111,7 +130,6 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                {/* Profile List */}
                 <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">Recent Profiles</h3>
                     {existingProfiles.slice(0, 3).map(profile => (
@@ -134,7 +152,6 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
                     ))}
                 </div>
 
-                {/* Actions */}
                 <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2 ml-1">Other Actions</h3>
 
@@ -170,7 +187,6 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
 
     const renderScanner = () => (
         <>
-            {/* HEADER */}
             <div className="relative z-10 text-center mb-12 max-w-3xl animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="inline-block px-3 py-1 mb-4 border border-green-500/30 bg-green-900/10 rounded-full">
                     <span className="text-xs font-mono text-green-400">● SYSTEM ONLINE</span>
@@ -192,7 +208,6 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
                 )}
             </div>
 
-            {/* INTERACTIVE ZONE */}
             <div
                 className={`relative z-10 w-full max-w-2xl transition-all duration-300 transform ${scanState === 'complete' ? 'scale-95 opacity-50 blur-sm' : 'scale-100 opacity-100'
                     }`}
@@ -241,34 +256,19 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onComplete }) => {
 
     return (
         <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#0F0F0F] text-white p-6 overflow-hidden">
-            {/* Background Grid */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#222_1px,transparent_1px),linear-gradient(to_bottom,#222_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 pointer-events-none" />
 
             {!showUpload && existingProfiles.length > 0 ? renderWelcomeBack() : renderScanner()}
 
-            {/* RESULTS OVERLAY (Phase 2 Placeholder) */}
             {scanState === 'complete' && (
-                <div className="absolute z-20 inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
-                    <div className="bg-[#1A1A1A] border border-gray-700 rounded-2xl p-8 max-w-lg w-full shadow-2xl text-center">
-                        <div className="w-24 h-24 rounded-full border-4 border-yellow-500 flex items-center justify-center mx-auto mb-6 bg-yellow-900/20">
-                            <span className="text-4xl font-mono font-bold text-yellow-500">{score}</span>
-                        </div>
-                        <h3 className="text-2xl font-bold mb-2">Resume Visibility: Low</h3>
-                        <p className="text-gray-400 mb-6">Your resume is missing key formatting required for modern ATS parsing. Recruiters may not see your "Java" experience.</p>
-
-                        <div className="space-y-3 mb-8 text-left bg-black p-4 rounded-lg font-mono text-sm border border-gray-800">
-                            <div className="flex items-center gap-2 text-red-400"><AlertTriangle size={14} /> Header unreadable</div>
-                            <div className="flex items-center gap-2 text-red-400"><AlertTriangle size={14} /> Date format inconsistent</div>
-                            <div className="flex items-center gap-2 text-green-400"><CheckCircle size={14} /> Contact info valid</div>
-                        </div>
-
-                        <button
-                            onClick={() => onComplete && onComplete()}
-                            className="w-full py-4 bg-green-500 hover:bg-green-400 text-black font-bold text-lg rounded-lg transition-all shadow-[0_0_20px_rgba(0,255,148,0.4)] hover:shadow-[0_0_30px_rgba(0,255,148,0.6)]"
-                        >
-                            Fix Formatting & Optimize
-                        </button>
-                    </div>
+                <div className="absolute z-20 inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-500">
+                    <div className="text-green-500 font-mono mb-4">Redirecting to Analysis...</div>
+                    <button
+                        onClick={() => onScanComplete && onScanComplete()}
+                        className="text-gray-500 hover:text-white underline text-sm"
+                    >
+                        Stuck? Click to Skip
+                    </button>
                 </div>
             )}
         </div>

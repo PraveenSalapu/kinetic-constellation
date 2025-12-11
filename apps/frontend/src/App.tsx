@@ -5,8 +5,11 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/Layout';
 import { AuthPage } from './components/Auth/AuthPage';
 import { HeroRoaster } from './components/Landing/HeroRoaster';
+import { ScanResults } from './components/Landing/ScanResults';
+import { DemographicsStep } from './components/Onboarding/DemographicsStep';
 import { useState } from 'react';
 
+// Protected route wrapper
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,17 +35,37 @@ function AppContent() {
   const [onboardingComplete, setOnboardingComplete] = useState(() => {
     return localStorage.getItem('onboardingComplete') === 'true';
   });
+  const [view, setView] = useState<'roaster' | 'results' | 'demographics' | 'editor'>('roaster');
 
-  const handleOnboardingComplete = () => {
+  const handleFinalComplete = () => {
     localStorage.setItem('onboardingComplete', 'true');
     setOnboardingComplete(true);
   };
 
-  if (!onboardingComplete) {
-    return <HeroRoaster onComplete={handleOnboardingComplete} />;
+  const handleSkipToEditor = () => {
+    handleFinalComplete();
+  };
+
+  if (onboardingComplete) {
+    return <Layout />;
   }
 
-  return <Layout />;
+  return (
+    <>
+      {view === 'roaster' && (
+        <HeroRoaster
+          onScanComplete={() => setView('results')}
+          onProfileSelect={handleSkipToEditor}
+        />
+      )}
+      {view === 'results' && (
+        <ScanResults onComplete={() => setView('demographics')} />
+      )}
+      {view === 'demographics' && (
+        <DemographicsStep onComplete={handleFinalComplete} />
+      )}
+    </>
+  );
 }
 
 function AppRoutes() {

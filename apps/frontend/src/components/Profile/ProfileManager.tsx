@@ -8,9 +8,10 @@ import { Loader2, Plus, Trash2, Check, X, FileText, Upload, AlertCircle } from '
 interface ProfileManagerProps {
     isOpen: boolean;
     onClose: () => void;
+    isEmbedded?: boolean;
 }
 
-export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose }) => {
+export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose, isEmbedded = false }) => {
     const { dispatch } = useResume();
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -31,7 +32,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
             if (localStorage.getItem('accessToken')) {
                 try {
                     const apiProfiles = await import('../../services/api').then(m => m.getProfiles());
-                    
+
                     const mappedProfiles = (apiProfiles as any[]).map(p => ({
                         id: p.id,
                         name: p.name,
@@ -39,7 +40,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                         updatedAt: new Date(p.updatedAt).getTime(),
                         isActive: p.isActive
                     }));
-                    
+
                     if (mappedProfiles.length > 0) {
                         setProfiles(mappedProfiles);
                         return;
@@ -48,7 +49,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                     console.warn('Failed to load profiles from API, falling back to local:', e);
                 }
             }
-            
+
             // Fallback to local storage
             setProfiles(getAllProfilesSync());
         } catch (e) {
@@ -61,29 +62,29 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
         if (localStorage.getItem('accessToken')) {
             try {
                 await import('../../services/api').then(m => m.updateProfile(id, { isActive: true }));
-                
+
                 const updated = profiles.map(p => ({
                     ...p,
                     isActive: p.id === id
                 }));
                 setProfiles(updated);
-                
+
                 const active = updated.find(p => p.isActive);
                 if (active) {
-                     dispatch({ type: 'SET_RESUME', payload: active.data });
-                     onClose();
+                    dispatch({ type: 'SET_RESUME', payload: active.data });
+                    if (!isEmbedded) onClose();
                 }
                 return;
             } catch (e) {
                 console.error('Failed to set active profile on API:', e);
             }
         }
-    
+
         const active = await setActiveProfileId(id);
         if (active) {
             dispatch({ type: 'SET_RESUME', payload: active.data });
             await loadProfiles();
-            onClose();
+            if (!isEmbedded) onClose();
         }
     };
 
@@ -114,10 +115,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
         setError(null);
 
         try {
-            let initialData = undefined;
-            if (resumeText.trim()) {
-                initialData = await parseResumeWithAI(resumeText);
-            }
+            const initialData = resumeText.trim() ? await parseResumeWithAI(resumeText) : undefined;
 
             // Create via API if authenticated
             if (localStorage.getItem('accessToken')) {
@@ -127,12 +125,11 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                     setShowAddForm(false);
                     setNewProfileName('');
                     setResumeText('');
-                    onClose();
+                    if (!isEmbedded) onClose();
                     return;
                 } catch (e: any) {
                     console.error('Failed to create profile via API:', e);
                     setError(e.message || 'Failed to create profile on server');
-                    // Don't fallback to local if API fails, user should know
                     return;
                 }
             }
@@ -147,7 +144,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
             setShowAddForm(false);
             setNewProfileName('');
             setResumeText('');
-            onClose();
+            if (!isEmbedded) onClose();
         } catch (e: any) {
             setError(e.message || 'Failed to create profile');
         } finally {
@@ -155,17 +152,11 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
         }
     };
 
-    const handleReset = () => {
-        if (confirm('WARNING: This will delete ALL profiles and reset the application to its initial state. This action cannot be undone. Are you sure?')) {
-            import('../../services/storage').then(m => m.resetApplication());
-        }
-    };
-
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-gray-200">
-            <div className="bg-[#111] border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    const content = (
+        <div className={`flex flex-col ${isEmbedded ? 'w-full h-full' : 'bg-[#111] border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden'}`}>
+            {!isEmbedded && (
                 <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gradient-to-r from-gray-900 to-black text-white">
                     <div>
                         <h2 className="text-2xl font-bold font-mono tracking-tight flex items-center gap-2">
@@ -177,156 +168,171 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose 
                         <X size={20} />
                     </button>
                 </div>
+            )}
 
-                <div className="p-6 overflow-y-auto flex-1 bg-[#111]">
-                    {error && (
-                        <div className="mb-4 p-4 bg-red-900/20 text-red-400 rounded-lg flex items-center gap-2 border border-red-800">
-                            <AlertCircle size={20} />
-                            <span>{error}</span>
-                        </div>
-                    )}
+            <div className={`overflow-y-auto flex-1 ${isEmbedded ? '' : 'p-6 bg-[#111]'}`}>
+                {error && (
+                    <div className="mb-4 p-4 bg-red-900/20 text-red-400 rounded-lg flex items-center gap-2 border border-red-800">
+                        <AlertCircle size={20} />
+                        <span>{error}</span>
+                    </div>
+                )}
 
-                    {!showAddForm ? (
-                        <div className="space-y-4">
-                            <div className="grid gap-4">
-                                {profiles.map((profile) => (
-                                    <div
-                                        key={profile.id}
-                                        className={`p-4 rounded-xl border transition-all ${profile.isActive
-                                            ? 'border-green-500/50 bg-green-900/10 shadow-[0_0_15px_rgba(0,255,100,0.1)]'
-                                            : 'border-gray-800 bg-[#1a1a1a] hover:border-gray-600'
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${profile.isActive ? 'bg-green-900/20 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
-                                                    <FileText size={24} />
-                                                </div>
-                                                <div>
-                                                    <h3 className={`font-bold font-mono ${profile.isActive ? 'text-green-400' : 'text-gray-300'}`}>
-                                                        {profile.name}
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500">
-                                                        Last updated: {new Date(profile.updatedAt).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {profile.isActive ? (
-                                                    <span className="px-3 py-1 bg-green-900/20 text-green-400 border border-green-500/30 rounded-full text-xs font-bold flex items-center gap-1 font-mono">
-                                                        <Check size={12} /> Active
-                                                    </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleSetActive(profile.id)}
-                                                        className="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors border border-transparent hover:border-gray-700"
-                                                    >
-                                                        Switch
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleDelete(profile.id)}
-                                                    disabled={profiles.length <= 1}
-                                                    className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-30"
-                                                    title="Delete Profile"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {profiles.length < 4 && (
-                                <button
-                                    onClick={() => setShowAddForm(true)}
-                                    className="w-full py-4 border border-dashed border-gray-700 rounded-xl text-gray-500 hover:border-green-500/50 hover:text-green-400 hover:bg-green-900/10 transition-all flex items-center justify-center gap-2 font-medium font-mono"
+                {!showAddForm ? (
+                    <div className="space-y-4">
+                        <div className="grid gap-4">
+                            {profiles.map((profile) => (
+                                <div
+                                    key={profile.id}
+                                    className={`p-4 rounded-xl border transition-all ${profile.isActive
+                                        ? 'border-green-500/50 bg-green-900/10 shadow-[0_0_15px_rgba(0,255,100,0.1)]'
+                                        : 'border-gray-800 bg-[#1a1a1a] hover:border-gray-600'
+                                        }`}
                                 >
-                                    <Plus size={20} />
-                                    CREATE_NEW_PROFILE
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <h3 className="text-lg font-bold text-white mb-4 font-mono">:: Create New Profile</h3>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Profile Name</label>
-                                    <input
-                                        type="text"
-                                        value={newProfileName}
-                                        onChange={(e) => setNewProfileName(e.target.value)}
-                                        placeholder="e.g. Senior Frontend Dev, Product Manager"
-                                        className="w-full px-4 py-2 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-white placeholder-gray-600"
-                                        autoFocus
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                                        Import from Resume (Optional)
-                                    </label>
-                                    <div className="relative">
-                                        <textarea
-                                            value={resumeText}
-                                            onChange={(e) => setResumeText(e.target.value)}
-                                            placeholder="Paste your existing resume text here to auto-populate..."
-                                            className="w-full px-4 py-3 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all min-h-[150px] text-sm text-gray-300 placeholder-gray-600 font-mono"
-                                        />
-                                        <div className="absolute bottom-3 right-3 text-xs text-gray-600 pointer-events-none">
-                                            {resumeText.length > 0 ? `${resumeText.length} chars` : 'Paste text'}
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${profile.isActive ? 'bg-green-900/20 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
+                                                <FileText size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className={`font-bold font-mono ${profile.isActive ? 'text-green-400' : 'text-gray-300'}`}>
+                                                    {profile.name}
+                                                </h3>
+                                                <p className="text-xs text-gray-500">
+                                                    Last updated: {new Date(profile.updatedAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {profile.isActive ? (
+                                                <span className="px-3 py-1 bg-green-900/20 text-green-400 border border-green-500/30 rounded-full text-xs font-bold flex items-center gap-1 font-mono">
+                                                    <Check size={12} /> Active
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleSetActive(profile.id)}
+                                                    className="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors border border-transparent hover:border-gray-700"
+                                                >
+                                                    Switch
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleDelete(profile.id)}
+                                                disabled={profiles.length <= 1}
+                                                className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-30"
+                                                title="Delete Profile"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                        <Upload size={12} />
-                                        AI will parse this text into your new profile structure.
-                                    </p>
                                 </div>
+                            ))}
+                        </div>
 
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        onClick={() => setShowAddForm(false)}
-                                        className="flex-1 px-4 py-2 text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-colors"
-                                        disabled={isParsing}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleCreateProfile}
-                                        disabled={isParsing || !newProfileName.trim()}
-                                        className="flex-1 px-4 py-2 bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/30 hover:border-green-500 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(0,255,100,0.1)]"
-                                    >
-                                        {isParsing ? (
-                                            <>
-                                                <Loader2 size={18} className="animate-spin" />
-                                                Parsing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Plus size={18} />
-                                                Create Profile
-                                            </>
-                                        )}
-                                    </button>
+                        {profiles.length < 4 && (
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="w-full py-4 border border-dashed border-gray-700 rounded-xl text-gray-500 hover:border-green-500/50 hover:text-green-400 hover:bg-green-900/10 transition-all flex items-center justify-center gap-2 font-medium font-mono"
+                            >
+                                <Plus size={20} />
+                                CREATE_NEW_PROFILE
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h3 className="text-lg font-bold text-white mb-4 font-mono">:: Create New Profile</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Profile Name</label>
+                                <input
+                                    type="text"
+                                    value={newProfileName}
+                                    onChange={(e) => setNewProfileName(e.target.value)}
+                                    placeholder="e.g. Senior Frontend Dev, Product Manager"
+                                    className="w-full px-4 py-2 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-white placeholder-gray-600"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Import from Resume (Optional)
+                                </label>
+                                <div className="relative">
+                                    <textarea
+                                        value={resumeText}
+                                        onChange={(e) => setResumeText(e.target.value)}
+                                        placeholder="Paste your existing resume text here to auto-populate..."
+                                        className="w-full px-4 py-3 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all min-h-[150px] text-sm text-gray-300 placeholder-gray-600 font-mono"
+                                    />
+                                    <div className="absolute bottom-3 right-3 text-xs text-gray-600 pointer-events-none">
+                                        {resumeText.length > 0 ? `${resumeText.length} chars` : 'Paste text'}
+                                    </div>
                                 </div>
+                                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                    <Upload size={12} />
+                                    AI will parse this text into your new profile structure.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    onClick={() => setShowAddForm(false)}
+                                    className="flex-1 px-4 py-2 text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-colors"
+                                    disabled={isParsing}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleCreateProfile}
+                                    disabled={isParsing || !newProfileName.trim()}
+                                    className="flex-1 px-4 py-2 bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/30 hover:border-green-500 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(0,255,100,0.1)]"
+                                >
+                                    {isParsing ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            Parsing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus size={18} />
+                                            Create Profile
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
+            </div>
 
+            {!isEmbedded && (
                 <div className="p-4 border-t border-gray-800 bg-[#111] flex justify-center">
                     <button
-                        onClick={handleReset}
+                        onClick={() => {
+                            if (confirm('WARNING: This will delete ALL profiles and reset the application to its initial state. This action cannot be undone. Are you sure?')) {
+                                import('../../services/storage').then(m => m.resetApplication());
+                            }
+                        }}
                         className="text-xs text-red-900/50 hover:text-red-400 hover:underline flex items-center gap-1 transition-colors"
                     >
                         <Trash2 size={12} />
                         Reset Application & Clear All Data
                     </button>
                 </div>
-            </div>
+            )}
+        </div>
+    );
+
+    if (isEmbedded) return content;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 text-gray-200">
+            {content}
         </div>
     );
 };
+

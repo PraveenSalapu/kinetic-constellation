@@ -15,8 +15,12 @@ const STORAGE_KEY_PROFILES = 'kinetic_profiles_v1';
 const MAX_PROFILES = 4;
 
 // Check if user is authenticated
-const isAuthenticated = (): boolean => {
-    return !!api.getAccessToken();
+import { supabase } from './supabase';
+
+// Check if user is authenticated
+const isAuthenticated = async (): Promise<boolean> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
 };
 
 // ============ LOCAL STORAGE OPERATIONS (fallback when not authenticated) ============
@@ -52,7 +56,7 @@ const apiToUserProfile = (apiProfile: any): UserProfile => ({
 // ============ UNIFIED PROFILE OPERATIONS ============
 
 export const getAllProfiles = async (): Promise<UserProfile[]> => {
-    if (isAuthenticated()) {
+    if (await isAuthenticated()) {
         try {
             const apiProfiles = await api.getProfiles();
             const profiles = (apiProfiles as any[]).map(apiToUserProfile);
@@ -77,7 +81,7 @@ export const createProfile = async (name: string, data: Resume = initialResume):
     const clonedData = JSON.parse(JSON.stringify(data));
     const resumeData = { ...clonedData, id: uuidv4() };
 
-    if (isAuthenticated()) {
+    if (await isAuthenticated()) {
         try {
             const apiProfile = await api.createProfile(name, resumeData);
             const profile = apiToUserProfile(apiProfile);
@@ -114,7 +118,7 @@ export const createProfile = async (name: string, data: Resume = initialResume):
 };
 
 export const saveProfile = async (profile: UserProfile): Promise<void> => {
-    if (isAuthenticated()) {
+    if (await isAuthenticated()) {
         try {
             await api.updateProfile(profile.id, {
                 name: profile.name,
@@ -134,8 +138,8 @@ export const saveProfile = async (profile: UserProfile): Promise<void> => {
         profiles[index] = { ...profile, updatedAt: Date.now() };
     } else {
         if (profiles.length >= MAX_PROFILES) {
-             // If it's a new profile being saved (unlikely via this method but possible)
-             if (index === -1) profiles.push({ ...profile, updatedAt: Date.now() });
+            // If it's a new profile being saved (unlikely via this method but possible)
+            if (index === -1) profiles.push({ ...profile, updatedAt: Date.now() });
         }
     }
 
@@ -144,13 +148,14 @@ export const saveProfile = async (profile: UserProfile): Promise<void> => {
 
 export const deleteProfile = async (id: string): Promise<void> => {
     // If authenticated, we rely on API mostly, but check local for "last profile" rule locally for speed or rely on API error
-    const profiles = isAuthenticated() ? await getAllProfiles() : getLocalProfiles();
+    const authenticated = await isAuthenticated();
+    const profiles = authenticated ? await getAllProfiles() : getLocalProfiles();
 
     if (profiles.length <= 1) {
         throw new Error('Cannot delete the last profile.');
     }
 
-    if (isAuthenticated()) {
+    if (authenticated) {
         try {
             await api.deleteProfile(id);
         } catch (error) {
@@ -167,7 +172,7 @@ export const deleteProfile = async (id: string): Promise<void> => {
     const wasActive = localProfiles.find(p => p.id === id)?.isActive;
     if (wasActive && filtered.length > 0) {
         filtered[0].isActive = true;
-        if (isAuthenticated()) {
+        if (await isAuthenticated()) {
             try {
                 await api.updateProfile(filtered[0].id, { isActive: true });
             } catch (error) {
@@ -183,12 +188,12 @@ export const setActiveProfileId = async (id: string): Promise<UserProfile | null
     // const profiles = isAuthenticated() ? await getAllProfiles() : getLocalProfiles(); // Unused
     let activeProfile: UserProfile | null = null;
 
-    if (isAuthenticated()) {
-         try {
-             await api.updateProfile(id, { isActive: true });
-         } catch (e) {
-             console.error('Failed to set active profile via API', e);
-         }
+    if (await isAuthenticated()) {
+        try {
+            await api.updateProfile(id, { isActive: true });
+        } catch (e) {
+            console.error('Failed to set active profile via API', e);
+        }
     }
 
     // Update local cache
@@ -201,7 +206,7 @@ export const setActiveProfileId = async (id: string): Promise<UserProfile | null
             isActive
         };
     });
-    
+
     saveLocalProfiles(updated);
     return activeProfile;
 };
@@ -251,7 +256,7 @@ export const getActiveProfileSync = (): UserProfile => {
 
 // Sync profiles from API to local storage (call after login)
 export const syncProfilesFromApi = async (): Promise<void> => {
-    if (!isAuthenticated()) return;
+    if (!(await isAuthenticated())) return;
 
     try {
         const apiProfiles = await api.getProfiles();
@@ -265,7 +270,7 @@ export const syncProfilesFromApi = async (): Promise<void> => {
 export const updateActiveProfileData = async (data: Resume): Promise<void> => {
     const active = getActiveProfileSync();
     const updatedProfile = { ...active, data, updatedAt: Date.now() };
-    
+
     // Update local storage manually
     const profiles = getLocalProfiles();
     const index = profiles.findIndex(p => p.id === active.id);
@@ -275,9 +280,9 @@ export const updateActiveProfileData = async (data: Resume): Promise<void> => {
     }
 
     // Sync to API
-    if (isAuthenticated()) {
+    if (await isAuthenticated()) {
         try {
-             await api.updateProfile(active.id, { data });
+            await api.updateProfile(active.id, { data });
         } catch (e) {
             console.error('Failed to sync profile update to API:', e);
         }
@@ -290,7 +295,7 @@ export const resetApplication = (): void => {
 };
 
 export const getProfileFromApi = async (): Promise<UserProfile | null> => {
-    if (!isAuthenticated()) return null;
+    if (!(await isAuthenticated())) return null;
     try {
         const profiles = await api.getProfiles();
         const active = (profiles as any[]).find((p: any) => p.isActive);

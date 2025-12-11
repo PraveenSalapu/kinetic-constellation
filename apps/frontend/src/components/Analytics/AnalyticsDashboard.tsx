@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, Target, Clock, Award, AlertCircle, CheckCircle, Calendar, Briefcase, BarChart3 } from 'lucide-react';
 import { getAnalytics, type ApplicationMetrics, type MarketInsight } from '../../services/analytics/JobSearchAnalytics';
-import { getDatabase, type ApplicationRecord } from '../../services/database/mongodb';
+// import { getDatabase, type ApplicationRecord } from '../../services/database/mongodb';
+import * as api from '../../services/apiApplication';
+import type { ApplicationRecord } from '../../services/apiApplication';
 
 interface AnalyticsDashboardProps {
   userId: string;
@@ -16,7 +18,7 @@ export function AnalyticsDashboard({ userId }: AnalyticsDashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'insights'>('overview');
 
   const analytics = getAnalytics(userId);
-  const db = getDatabase();
+  // const db = getDatabase();
 
   useEffect(() => {
     loadData();
@@ -25,12 +27,13 @@ export function AnalyticsDashboard({ userId }: AnalyticsDashboardProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      await db.initialize();
-      const [metricsData, insightsData, recommendationsData, appsData] = await Promise.all([
-        analytics.calculateMetrics(),
-        analytics.generateMarketInsights(),
-        analytics.getRecommendations(),
-        db.getAllApplications(userId)
+      // Fetch applications from API
+      const appsData = await api.getApplications();
+
+      const [metricsData, insightsData, recommendationsData] = await Promise.all([
+        analytics.calculateMetrics(appsData),
+        analytics.generateMarketInsights(appsData),
+        analytics.getRecommendations(appsData)
       ]);
 
       setMetrics(metricsData);
@@ -290,8 +293,8 @@ export function AnalyticsDashboard({ userId }: AnalyticsDashboardProps) {
             ) : (
               insights.map((insight, idx) => (
                 <div key={idx} className={`border-l-4 p-4 rounded ${insight.priority === 'high' ? 'border-red-500 bg-red-900/10' :
-                    insight.priority === 'medium' ? 'border-orange-500 bg-orange-900/10' :
-                      'border-blue-500 bg-blue-900/10'
+                  insight.priority === 'medium' ? 'border-orange-500 bg-orange-900/10' :
+                    'border-blue-500 bg-blue-900/10'
                   }`}>
                   <h3 className="font-semibold mb-1 text-gray-200">{insight.category}</h3>
                   <p className="text-gray-400 mb-2">{insight.insight}</p>

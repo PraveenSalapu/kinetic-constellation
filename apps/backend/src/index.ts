@@ -12,11 +12,12 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
 // Import routes after env is loaded
-import authRoutes from './routes/auth.js';
+// Authorization routes removed (Supabase Native Auth)
 import profileRoutes from './routes/profiles.js';
 import tailorRoutes from './routes/tailor.js';
 import autofillRoutes from './routes/autofill.js';
 import scrapeRoutes from './routes/scrape.js';
+import applicationRoutes from './routes/applications.js';
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
@@ -49,11 +50,12 @@ app.get('/health', (_req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+// app.use('/api/auth', authRoutes); // Handled by Supabase
 app.use('/api/profiles', profileRoutes);
 app.use('/api/tailor', tailorRoutes);
 app.use('/api/autofill', autofillRoutes);
 app.use('/api/scrape', scrapeRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
