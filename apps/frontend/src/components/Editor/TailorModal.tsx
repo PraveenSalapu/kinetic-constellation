@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Wand2, Loader2, Lightbulb, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 import { useResume } from '../../context/ResumeContext';
 import { tailorResume } from '../../services/gemini';
 import type { TailorResponse } from '../../types';
@@ -270,15 +271,89 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
     };
 
+    // Calculate Preview Text for Live Scoring
+    const getPreviewResumeText = () => {
+        if (!tailorResult) return '';
+
+        // 1. New Summary
+        const summaryText = tailorResult.tailoredSummary || resume.summary || '';
+
+        // 2. Skills (Original + New)
+        const originalSkills = (resume.skills || []).flatMap(g => g.items);
+        const newSkills = (tailorResult.missingHardSkills || []).map(s => s.name);
+        const skillsText = [...originalSkills, ...newSkills].join(' ');
+
+        // 3. Experience (With Swapped Bullets)
+        const experienceText = (resume.experience || []).map(exp => {
+            const updates = tailorResult.improvedExperience?.find(u => u.experienceId === exp.id);
+            const selections = updates ? selectedImprovements.experience[exp.id] : null;
+
+            let description = [...exp.description];
+
+            if (updates && selections) {
+                // Apply Revisions
+                if (updates.revisedBullets && selections.revised) {
+                    updates.revisedBullets.forEach((rev, i) => {
+                        if (selections.revised.includes(i)) {
+                            description.push(rev.new);
+                        }
+                    });
+                }
+                // Apply Recommendations
+                if (updates.recommendedBullets && selections.recommended) {
+                    updates.recommendedBullets.forEach((rec, i) => {
+                        if (selections.recommended.includes(i)) {
+                            description.push(rec.bullet);
+                        }
+                    });
+                }
+            }
+
+            return `${exp.position} ${exp.company} ${description.join(' ')}`;
+        }).join(' ');
+
+        // 4. New Projects
+        const projectsText = (tailorResult.projectSuggestions || [])
+            .filter((_, i) => selectedImprovements.projects.includes(i))
+            .map(p => `${p.title} ${p.description} ${p.technologies.join(' ')}`)
+            .join(' ');
+
+        // 5. Old Projects/Education
+        const oldProjects = (resume.projects || []).map(p => `${p.name} ${p.description}`).join(' ');
+        const education = (resume.education || []).map(e => `${e.degree} ${e.fieldOfStudy} ${e.institution}`).join(' ');
+
+        return [summaryText, skillsText, experienceText, projectsText, oldProjects, education].join(' ');
+    };
+
+    const previewText = getPreviewResumeText();
+
+    const { score: previewScore } = useRealtimeMatch(
+        tailorResult ? previewText : '',
+        jobDescription
+    );
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-[#111] border border-gray-800 rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between p-6 border-b border-gray-800">
-                    <h2 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
-                        <Wand2 className="text-indigo-400" /> Tailor Resume to Job
-                    </h2>
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
+                            <Wand2 className="text-indigo-400" /> Tailor Resume to Job
+                        </h2>
+                        {tailorResult && (
+                            <div className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all duration-500 ${previewScore >= 70 ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                previewScore >= 40 ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
+                                    'bg-gray-800 text-gray-400 border-gray-700'
+                                }`}>
+                                <Wand2 size={12} />
+                                <span className="text-xs font-bold">
+                                    Projected Match: {previewScore}%
+                                </span>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
                         <X size={24} />
                     </button>
@@ -497,7 +572,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                         </button>
                     )}
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authenticateToken } from '../middleware/auth.js';
 import { generateResumePDF } from '../services/pdf.js';
+import { updateProfileEmbedding, computeMatchScoresForProfile } from '../services/matchScore.js';
 
 const router: Router = Router();
 
@@ -149,6 +150,13 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // Generate embedding for the profile in the background
+    // Don't await - let it happen asynchronously
+    if (data) {
+      updateProfileEmbedding(profileId, data as any)
+        .catch(err => console.error('Background embedding generation failed:', err));
+    }
+
     res.status(201).json({
       success: true,
       profile: {
@@ -226,6 +234,13 @@ router.put('/:id', async (req: Request, res: Response) => {
       console.error('Error updating profile:', error);
       res.status(500).json({ error: 'Failed to update profile' });
       return;
+    }
+
+    // Regenerate embedding if resume data changed
+    if (validation.data.data && updated.data) {
+      updateProfileEmbedding(id, updated.data as any)
+        .then(() => computeMatchScoresForProfile(id))
+        .catch(err => console.error('Background embedding regeneration failed:', err));
     }
 
     res.json({

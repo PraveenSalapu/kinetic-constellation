@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Job } from '../../types';
+import { getMatchedJobs } from '../api';
 
 // Access environment variables using Vite's syntax
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -13,15 +14,41 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
 /**
- * Fetch jobs from Supabase "jobs" table
- * Ordered by Match Score and creation date
+ * Fetch jobs from backend API with match scores (for authenticated users)
+ * Falls back to direct Supabase query for unauthenticated users
  */
 export const fetchJobsFromDB = async (): Promise<Job[]> => {
     if (!supabaseUrl || !supabaseAnonKey) return [];
 
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+        // Authenticated: use backend API for personalized match scores
+        try {
+            const jobs = await getMatchedJobs();
+            return jobs.map(record => ({
+                id: record.id,
+                title: record.title,
+                company: record.company,
+                link: record.link,
+                summary: record.description || '',
+                description: record.description,
+                match_score: Number(record.match_score) || 0,
+                missing_skills: record.missing_skills || [],
+                location: record.location,
+                created_at: record.created_at
+            })) as Job[];
+        } catch (error) {
+            console.error('Error fetching matched jobs from API, falling back to Supabase:', error);
+            // Fall through to direct Supabase query
+        }
+    }
+
+    // Unauthenticated or API failed: direct Supabase query
     const { data, error } = await supabase
         .from('jobs')
-        .select('*')
+        .select('id, title, company, link, description, location, created_at, match_score, missing_skills')
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -29,14 +56,16 @@ export const fetchJobsFromDB = async (): Promise<Job[]> => {
         throw error;
     }
 
-    // Map DB fields to our Job interface if needed (though they should align closely)
     return (data || []).map(record => ({
+        id: record.id,
         title: record.title,
         company: record.company,
         link: record.link,
-        summary: record.description || '', // Mapping description to summary
+        summary: record.description || '',
+        description: record.description,
         match_score: Number(record.match_score) || 0,
         missing_skills: record.missing_skills || [],
-        posted_at: record.created_at
+        location: record.location,
+        created_at: record.created_at
     })) as Job[];
 };

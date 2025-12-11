@@ -33,6 +33,7 @@ const createApplicationSchema = z.object({
     source: z.string().optional(),
     notes: z.string().optional(),
     salaryText: z.string().optional(),
+    resumeVersion: z.string().uuid().optional(), // Valid UUID for linked profile
 });
 
 const updateApplicationSchema = z.object({
@@ -45,6 +46,7 @@ const updateApplicationSchema = z.object({
     source: z.string().optional(),
     notes: z.string().optional(),
     salaryText: z.string().optional(),
+    resumeVersion: z.string().uuid().optional(),
     timeline: z.array(z.object({
         date: z.string(),
         status: z.string(),
@@ -57,9 +59,10 @@ router.get('/', async (req: Request, res: Response) => {
     try {
         const userId = req.userId;
 
+        // Join with profiles table to get resume data
         const { data: applications, error } = await getSupabase()
             .from('applications')
-            .select('*')
+            .select('*, resume_snapshot:profiles!resume_version(data)')
             .eq('user_id', userId)
             .order('applied_date', { ascending: false });
 
@@ -83,6 +86,8 @@ router.get('/', async (req: Request, res: Response) => {
             notes: app.notes,
             salaryText: app.salary_text,
             timeline: app.timeline,
+            resumeVersion: app.resume_version,
+            resumeSnapshot: (app.resume_snapshot as any)?.data, // Extract nested data
             createdAt: app.created_at,
             updatedAt: app.updated_at,
         }));
@@ -105,7 +110,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
         const { data: app, error } = await getSupabase()
             .from('applications')
-            .select('*')
+            .select('*, resume_snapshot:profiles!resume_version(data)')
             .eq('id', id)
             .eq('user_id', userId)
             .single();
@@ -130,6 +135,8 @@ router.get('/:id', async (req: Request, res: Response) => {
                 notes: app.notes,
                 salaryText: app.salary_text,
                 timeline: app.timeline,
+                resumeVersion: app.resume_version,
+                resumeSnapshot: (app.resume_snapshot as any)?.data,
                 createdAt: app.created_at,
                 updatedAt: app.updated_at,
             },
@@ -153,7 +160,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         const {
             company, jobTitle, jobUrl, location, status,
-            appliedDate, source, notes, salaryText
+            appliedDate, source, notes, salaryText, resumeVersion
         } = validation.data;
 
         const appId = uuidv4();
@@ -171,6 +178,7 @@ router.post('/', async (req: Request, res: Response) => {
             source: source || 'Manual Entry',
             notes,
             salary_text: salaryText,
+            resume_version: resumeVersion, // Link to profile
             timeline: [{ date: now, status: status || 'saved', notes: 'Application created' }],
             created_at: now,
             updated_at: now,

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useResume } from '../../context/ResumeContext';
-import { WifiOff, Calendar } from 'lucide-react';
+import { WifiOff, Calendar, RefreshCw, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
 import { fetchJobsFromDB } from '../../services/database/supabase';
+import { refreshMatchScores } from '../../services/api';
 import type { Job } from '../../types';
 
 // 1. CONFIGURATION
@@ -37,12 +38,49 @@ const MOCK_JOBS: Job[] = [
     }
 ];
 
+type SortField = 'match_score' | 'created_at' | 'company';
+type SortOrder = 'asc' | 'desc';
+
 export const JobTable: React.FC = () => {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [refreshingScores, setRefreshingScores] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [usingMockData, setUsingMockData] = useState<boolean>(false);
+    const [sortField, setSortField] = useState<SortField>('match_score');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
     const { resume, dispatch } = useResume();
+
+    // Sort jobs based on current sort settings
+    const sortedJobs = [...jobs].sort((a, b) => {
+        let comparison = 0;
+        switch (sortField) {
+            case 'match_score':
+                comparison = (a.match_score || 0) - (b.match_score || 0);
+                break;
+            case 'created_at':
+                comparison = new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+                break;
+            case 'company':
+                comparison = a.company.localeCompare(b.company);
+                break;
+        }
+        return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    const toggleSort = (field: SortField) => {
+        if (sortField === field) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortOrder('desc');
+        }
+    };
+
+    const getSortIcon = (field: SortField) => {
+        if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-50" />;
+        return sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />;
+    };
 
     const handleTailor = (job: Job) => {
         dispatch({
@@ -83,6 +121,21 @@ export const JobTable: React.FC = () => {
             setJobs(MOCK_JOBS);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Refresh match scores for current profile
+    const handleRefreshScores = async () => {
+        try {
+            setRefreshingScores(true);
+            await refreshMatchScores();
+            // Re-fetch jobs to get updated scores
+            await handleFetchJobs();
+        } catch (err: any) {
+            console.error("Failed to refresh scores:", err);
+            // Don't show error for auth issues - user might not be logged in
+        } finally {
+            setRefreshingScores(false);
         }
     };
 
@@ -130,13 +183,24 @@ export const JobTable: React.FC = () => {
                             Matches for: <span className="font-semibold text-green-400 bg-green-900/20 border border-green-800 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
                         </p>
                     </div>
-                    <button
-                        onClick={handleFetchJobs}
-                        className="bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-                    >
-                        <Calendar className="w-4 h-4" />
-                        <span>Refresh Jobs</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleRefreshScores}
+                            disabled={refreshingScores}
+                            className="bg-green-900/40 hover:bg-green-900/60 text-green-300 border border-green-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+                            title="Recalculate match scores based on your current profile"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${refreshingScores ? 'animate-spin' : ''}`} />
+                            <span>{refreshingScores ? 'Calculating...' : 'Refresh Scores'}</span>
+                        </button>
+                        <button
+                            onClick={handleFetchJobs}
+                            className="bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                        >
+                            <Calendar className="w-4 h-4" />
+                            <span>Refresh Jobs</span>
+                        </button>
+                    </div>
                 </div>
 
                 {usingMockData && (
@@ -157,11 +221,23 @@ export const JobTable: React.FC = () => {
                             {/* TABLE HEADER */}
                             <thead className="bg-[#222]">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
-                                        Match
+                                    <th
+                                        scope="col"
+                                        className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800 cursor-pointer hover:bg-[#2a2a2a] transition-colors"
+                                        onClick={() => toggleSort('match_score')}
+                                    >
+                                        <span className="flex items-center gap-1">
+                                            Match {getSortIcon('match_score')}
+                                        </span>
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
-                                        Role & Company
+                                    <th
+                                        scope="col"
+                                        className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800 cursor-pointer hover:bg-[#2a2a2a] transition-colors"
+                                        onClick={() => toggleSort('company')}
+                                    >
+                                        <span className="flex items-center gap-1">
+                                            Role & Company {getSortIcon('company')}
+                                        </span>
                                     </th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
                                         Missing Skills
@@ -177,8 +253,8 @@ export const JobTable: React.FC = () => {
 
                             {/* TABLE BODY */}
                             <tbody className="bg-[#1a1a1a] divide-y divide-gray-800">
-                                {jobs.map((job, index) => (
-                                    <tr key={index} className="hover:bg-[#252525] transition-colors duration-150 ease-in-out group">
+                                {sortedJobs.map((job, index) => (
+                                    <tr key={job.id || index} className="hover:bg-[#252525] transition-colors duration-150 ease-in-out group">
 
                                         {/* SCORE COLUMN */}
                                         <td className="px-6 py-4 whitespace-nowrap border-r border-gray-800">

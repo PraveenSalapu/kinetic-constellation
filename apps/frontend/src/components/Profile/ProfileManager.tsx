@@ -5,6 +5,8 @@ import { parseResumeWithAI } from '../../services/parser';
 import { useResume } from '../../context/ResumeContext';
 import { Loader2, Plus, Trash2, Check, X, FileText, Upload, AlertCircle } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+
 interface ProfileManagerProps {
     isOpen: boolean;
     onClose: () => void;
@@ -13,6 +15,7 @@ interface ProfileManagerProps {
 
 export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose, isEmbedded = false }) => {
     const { dispatch } = useResume();
+    const { isAuthenticated } = useAuth(); // Use proper auth context
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newProfileName, setNewProfileName] = useState('');
@@ -24,12 +27,12 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
         if (isOpen) {
             loadProfiles();
         }
-    }, [isOpen]);
+    }, [isOpen, isAuthenticated]); // Reload when auth state changes
 
     const loadProfiles = async () => {
         try {
-            // Try loading from API first if authenticated
-            if (localStorage.getItem('accessToken')) {
+            // Try loading from API if authenticated via Supabase
+            if (isAuthenticated) {
                 try {
                     const apiProfiles = await import('../../services/api').then(m => m.getProfiles());
 
@@ -50,7 +53,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
                 }
             }
 
-            // Fallback to local storage
+            // Fallback to local storage (only if not auth or API empty/failed)
             setProfiles(getAllProfilesSync());
         } catch (e) {
             console.error('Error loading profiles:', e);
@@ -59,7 +62,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
 
     const handleSetActive = async (id: string) => {
         // If using API, we should update the active status on the server
-        if (localStorage.getItem('accessToken')) {
+        if (isAuthenticated) {
             try {
                 await import('../../services/api').then(m => m.updateProfile(id, { isActive: true }));
 
@@ -67,6 +70,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
                     ...p,
                     isActive: p.id === id
                 }));
+                // Manually update local state to reflect change immediately
                 setProfiles(updated);
 
                 const active = updated.find(p => p.isActive);
@@ -91,7 +95,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
     const handleDelete = async (id: string) => {
         if (confirm('Are you sure you want to delete this profile?')) {
             try {
-                if (localStorage.getItem('accessToken')) {
+                if (isAuthenticated) {
                     await import('../../services/api').then(m => m.deleteProfile(id));
                     await loadProfiles();
                     return;
@@ -118,7 +122,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
             const initialData = resumeText.trim() ? await parseResumeWithAI(resumeText) : undefined;
 
             // Create via API if authenticated
-            if (localStorage.getItem('accessToken')) {
+            if (isAuthenticated) {
                 try {
                     await import('../../services/api').then(m => m.createProfile(newProfileName, initialData || {}));
                     await loadProfiles();
@@ -257,25 +261,102 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">
-                                    Import from Resume (Optional)
-                                </label>
+                            {/* Import Method Selection */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-400">Import Method</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setResumeText('')} // Clear text implies intended "file" mode visual or just use logic
+                                        // Actually let's use a local state for mode if we want tabs, but for simplicity:
+                                        // We'll show File Upload OR Text Paste.
+                                        className="hidden"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="relative group">
+                                        <input
+                                            type="file"
+                                            accept=".pdf"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    if (file.size > 5 * 1024 * 1024) {
+                                                        setError('File size must be less than 5MB');
+                                                        return;
+                                                    }
+
+                                                    setIsParsing(true);
+                                                    setError(null);
+
+                                                    try {
+                                                        const reader = new FileReader();
+                                                        reader.onload = async () => {
+                                                            const base64 = (reader.result as string).split(',')[1];
+                                                            try {
+                                                                // Dynamically import parsing logic to avoid bundle issues
+                                                                const { parseResumeFromPdf } = await import('../../services/parser');
+                                                                const parsedData = await parseResumeFromPdf(base64);
+
+                                                                // Auto-create
+                                                                if (localStorage.getItem('accessToken')) {
+                                                                    await import('../../services/api').then(m => m.createProfile(newProfileName || 'New Uploaded Profile', parsedData));
+                                                                } else {
+                                                                    const newProfile = await createProfile(newProfileName || 'New Uploaded Profile', parsedData);
+                                                                    await setActiveProfileId(newProfile.id);
+                                                                }
+
+                                                                await loadProfiles();
+                                                                setShowAddForm(false);
+                                                                if (!isEmbedded) onClose();
+                                                            } catch (err: any) {
+                                                                setError(err.message || 'Failed to parse PDF');
+                                                            } finally {
+                                                                setIsParsing(false);
+                                                            }
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    } catch (err) {
+                                                        setIsParsing(false);
+                                                        setError('Failed to read file');
+                                                    }
+                                                }
+                                            }}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                            disabled={isParsing}
+                                        />
+                                        <div className="w-full p-4 border border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 group-hover:border-green-500/50 group-hover:text-green-400 transition-colors bg-[#1a1a1a]">
+                                            <Upload size={20} />
+                                            <span className="text-sm font-medium">Upload PDF</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            // Start Blank Logic
+                                            handleCreateProfile(); // Calling create with empty text creates blank
+                                        }}
+                                        disabled={isParsing || !newProfileName.trim()}
+                                        className="w-full p-4 border border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-indigo-500/50 hover:text-indigo-400 transition-colors bg-[#1a1a1a]"
+                                    >
+                                        <FileText size={20} />
+                                        <span className="text-sm font-medium">Start Blank</span>
+                                    </button>
+                                </div>
+
+                                <div className="text-center text-gray-600 text-xs my-2">- OR -</div>
+
                                 <div className="relative">
                                     <textarea
                                         value={resumeText}
                                         onChange={(e) => setResumeText(e.target.value)}
-                                        placeholder="Paste your existing resume text here to auto-populate..."
-                                        className="w-full px-4 py-3 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all min-h-[150px] text-sm text-gray-300 placeholder-gray-600 font-mono"
+                                        placeholder="Paste your existing resume text here..."
+                                        className="w-full px-4 py-3 bg-[#1a1a1a] border border-gray-700 rounded-lg focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all min-h-[100px] text-sm text-gray-300 placeholder-gray-600 font-mono"
                                     />
                                     <div className="absolute bottom-3 right-3 text-xs text-gray-600 pointer-events-none">
                                         {resumeText.length > 0 ? `${resumeText.length} chars` : 'Paste text'}
                                     </div>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                    <Upload size={12} />
-                                    AI will parse this text into your new profile structure.
-                                </p>
                             </div>
 
                             <div className="flex gap-3 pt-4">
@@ -299,15 +380,16 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
                                     ) : (
                                         <>
                                             <Plus size={18} />
-                                            Create Profile
+                                            {resumeText.trim() ? 'Create from Text' : 'Create Profile'}
                                         </>
                                     )}
                                 </button>
                             </div>
                         </div>
                     </div>
-                )}
-            </div>
+                )
+                }
+            </div >
 
             {!isEmbedded && (
                 <div className="p-4 border-t border-gray-800 bg-[#111] flex justify-center">
@@ -324,7 +406,7 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
                     </button>
                 </div>
             )}
-        </div>
+        </div >
     );
 
     if (isEmbedded) return content;

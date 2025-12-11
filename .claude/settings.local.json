@@ -30,7 +30,8 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "WebSearch",
-      "WebFetch(domain:google.github.io)"
+      "WebFetch(domain:google.github.io)",
+      "WebFetch(domain:ai.google.dev)"
     ],
     "deny": [],
     "ask": []

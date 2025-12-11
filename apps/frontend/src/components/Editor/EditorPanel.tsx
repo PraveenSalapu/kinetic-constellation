@@ -19,8 +19,8 @@ import { ConfirmModal } from '../UI/ConfirmModal';
 import { Download, FileText, Users, Wand2, XCircle, Save } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
-import { getDatabase } from '../../services/database/mongodb';
 import { v4 } from 'uuid';
+import * as api from '../../services/apiApplication';
 import {
     DndContext,
     closestCenter,
@@ -39,8 +39,8 @@ import {
 import { SortableSection } from './SortableSection';
 
 import { LayoutSettings } from './LayoutSettings';
-
-import ErrorBoundary from '../ErrorBoundary';
+import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
+import { calculateDeepMatchScore, createProfile } from '../../services/api'; import { Brain } from 'lucide-react'; import ErrorBoundary from '../ErrorBoundary';
 
 
 
@@ -53,6 +53,48 @@ export const EditorPanel = () => {
     const [showATSScore, setShowATSScore] = useState(false);
     const [showTailorModal, setShowTailorModal] = useState(false);
 
+    // Serialize resume for realtime analysis
+    // Correctly extract text from top-level properties based on the schema
+    const resumeText = [
+        resume.summary || '',
+        ...(resume.experience || []).map(exp => `${exp.position || ''} ${exp.company || ''} ${(exp.description || []).join(' ')}`),
+        ...(resume.education || []).map(edu => `${edu.degree || ''} ${edu.fieldOfStudy || ''} ${edu.institution || ''}`),
+        ...(resume.skills || []).flatMap(grp => grp.items || []),
+        ...(resume.projects || []).map(prj => `${prj.name || ''} ${prj.description || ''} ${(prj.technologies || []).join(' ')} ${prj.bullets?.join(' ') || ''}`),
+        ...(resume.certifications || []).map(cert => `${cert.name} ${cert.issuer}`)
+    ].filter(Boolean).join(' ');
+
+    console.log('UseRealtimeMatch Inputs:', {
+        resumeLength: resumeText.length,
+        jobDescLength: resume.tailoringJob?.description?.length || 0,
+        jobDescPreview: resume.tailoringJob?.description?.substring(0, 50)
+    });
+
+    const { score: fastScore, isReady: isModelReady, isLoading: isModelLoading, error: modelError, retry: retryModel } = useRealtimeMatch(
+        resumeText || '',
+        resume.tailoringJob?.description || ''
+    );
+
+    // SERVER-SIDE ANALYSIS STATE (Slow Path)
+    const [serverScore, setServerScore] = useState<number | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    const handleDeepAnalysis = async () => {
+        if (!resume.tailoringJob?.description) return;
+
+        setIsAnalyzing(true);
+        try {
+            const result = await calculateDeepMatchScore(resume, resume.tailoringJob.description);
+            setServerScore(result.score);
+            addToast('success', `Deep Analysis Complete: ${result.score}%`);
+        } catch (err) {
+            console.error(err);
+            addToast('error', 'Deep Analysis failed');
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     // Auto-open modal if we arrive at the editor in tailoring mode (e.g. from Jobs page)
     useEffect(() => {
         if (resume.isTailoring) {
@@ -60,37 +102,7 @@ export const EditorPanel = () => {
         }
     }, []); // Run only on mount
     const [showTrackModal, setShowTrackModal] = useState(false);
-    const handleSaveApplication = async () => {
-        if (!resume.tailoringJob) return;
 
-        try {
-            const db = getDatabase();
-            await db.initialize();
-
-            await db.createApplication({
-                id: v4(),
-                userId: 'user123',
-                company: resume.tailoringJob.company,
-                jobTitle: resume.tailoringJob.title,
-                jobUrl: resume.tailoringJob.link,
-                location: 'United States',
-                status: 'applied',
-                appliedDate: new Date(),
-                source: 'Kinetic Job Board',
-                timeline: [{ status: 'applied', date: new Date() }],
-                tags: ['Tailored'],
-                notes: `Tailored Resume Version based on AI optimization.`,
-                lastUpdated: new Date()
-            });
-            addToast('success', 'Application saved to tracker!');
-            if (resume.isTailoring) {
-                setShowTrackModal(true);
-            }
-        } catch (err) {
-            console.error(err);
-            addToast('error', 'Failed to save to tracker');
-        }
-    };
 
     const handleStartTailoring = () => {
         if (!resume.isTailoring) {
@@ -163,52 +175,59 @@ export const EditorPanel = () => {
     );
     const handleTrackApplication = async () => {
         console.log('handleTrackApplication called!');
-        console.log('resume.tailoringJob:', resume.tailoringJob);
         if (!resume.tailoringJob) {
             console.log('No tailoringJob found, exiting...');
             return;
         }
 
         try {
-            const db = getDatabase();
-            await db.initialize();
+            // 1. Create a Snapshot Profile (Hidden/Versioned)
+            // This ensures we have a persistent copy of the resume as it was at this moment
+            // We use the 'createProfile' from the main api service (mapped to profiles table)
+            const snapshotName = `Application Snapshot: ${resume.tailoringJob.company} - ${new Date().toLocaleDateString()}`;
 
-            await db.createApplication({
-                id: v4(),
-                userId: 'user123',
+            // Note: createProfile returns { success, profile } or the profile object depending on implementation.
+            // Based on api.ts, it returns data.profile.
+            const snapshotProfile = await createProfile(snapshotName, resume);
+
+            if (!snapshotProfile || !snapshotProfile.id) {
+                throw new Error('Failed to create snapshot profile');
+            }
+
+            console.log('Snapshot profile created:', snapshotProfile.id);
+
+            // 2. Track Application with Link
+            await api.createApplication({
                 company: resume.tailoringJob.company || 'Unknown Company',
                 jobTitle: resume.tailoringJob.title || 'Unknown Position',
-                jobDescription: resume.tailoringJob.description || '',
                 jobUrl: resume.tailoringJob.link,
                 status: 'applied',
                 appliedDate: new Date(),
-                lastUpdated: new Date(),
                 source: 'AI Tailor',
                 timeline: [{
                     date: new Date(),
                     status: 'applied',
                     notes: 'Application tracked after tailoring'
                 }],
-                resumeSnapshot: resume,
+                resumeVersion: snapshotProfile.id, // Link to the snapshot
                 tags: [],
-                notes: ''
+                notes: `Job Description: ${resume.tailoringJob.description ? resume.tailoringJob.description.substring(0, 100) + '...' : 'N/A'}`
             });
 
-            console.log('Application saved successfully!');
+            console.log('Application saved successfully to Supabase with Resume Version!');
             addToast('success', `Tracked: ${resume.tailoringJob.title} at ${resume.tailoringJob.company}`);
 
-            console.log('Discarding tailoring...');
             // Reset to base version
             dispatch({ type: 'DISCARD_TAILORING' });
             setShowTrackModal(false);
 
-            // TODO: Navigate to tracking/jobs page
-            addToast('info', 'Navigating to jobs tracker...');
         } catch (error) {
             console.error('Error tracking application:', error);
             addToast('error', 'Failed to track application');
         }
     };
+
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
 
@@ -254,31 +273,63 @@ export const EditorPanel = () => {
                         <Users size={14} />
                         Profiles
                     </button>
+
                     {resume.isTailoring && (
-                        <div className="flex items-center gap-2 ml-4">
-                            <div className="px-3 py-1 bg-yellow-900/30 text-yellow-500 text-xs font-medium rounded-full border border-yellow-800 flex items-center gap-1">
-                                <span>Tailoring Mode</span>
-                                <button onClick={handleDiscardTailoring} className="ml-1 hover:text-red-400" title="Discard Changes">
-                                    <XCircle size={14} />
-                                </button>
-                            </div>
-                            {resume.tailoringJob && (
-                                <button
-                                    onClick={handleSaveApplication}
-                                    className="px-3 py-1 bg-green-900/30 text-green-400 text-xs font-medium rounded-full border border-green-800 flex items-center gap-1 hover:bg-green-900/50 transition-colors"
-                                    title="Save Application to Tracker"
-                                >
-                                    <Save size={14} />
-                                    Save App
-                                </button>
-                            )}
+                        <div className="px-3 py-1 bg-yellow-900/30 text-yellow-500 text-xs font-medium rounded-full border border-yellow-800 flex items-center gap-1 ml-4">
+                            <span>Tailoring Mode</span>
                         </div>
                     )}
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex items-center gap-3">
+                    {/* RIGHT SIDE HEADER ITEMS */}
+
+                    {/* SCORE BADGES */}
+                    {resume.isTailoring && (
+                        <>
+                            {/* Display Error if Model Failed */}
+                            {modelError ? (
+                                <button
+                                    onClick={retryModel}
+                                    className="px-3 py-1 rounded-full border border-red-800 bg-red-900/30 text-red-400 flex items-center gap-2"
+                                    title={modelError}
+                                >
+                                    <XCircle size={14} />
+                                    <span className="text-xs font-bold">AI Fail (Retry)</span>
+                                </button>
+                            ) : (
+                                <div className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all duration-300 ${fastScore >= 70 ? 'bg-green-900/40 text-green-400 border-green-800' :
+                                    fastScore >= 40 ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800' :
+                                        'bg-gray-800 text-gray-400 border-gray-700'
+                                    }`}
+                                    title="Fast Score (Updates in browser)"
+                                >
+                                    <Wand2 size={12} className={isModelLoading ? "animate-spin" : ""} />
+                                    <span className="text-xs font-bold">
+                                        {isModelLoading ? '...' : `Fast: ${fastScore}%`}
+                                    </span>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleDeepAnalysis}
+                                disabled={isAnalyzing}
+                                className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all duration-300 ${serverScore !== null
+                                    ? (serverScore >= 70 ? 'bg-indigo-900/40 text-indigo-400 border-indigo-800' : 'bg-indigo-900/40 text-indigo-400 border-indigo-800')
+                                    : 'bg-indigo-600/20 text-indigo-300 border-indigo-500/30 hover:bg-indigo-600/40'
+                                    }`}
+                                title="Run Deep Check"
+                            >
+                                <Brain size={12} className={isAnalyzing ? "animate-spin" : ""} />
+                                <span className="text-xs font-bold">
+                                    {isAnalyzing ? '...' : (serverScore !== null ? `Deep: ${serverScore}%` : 'Check')}
+                                </span>
+                            </button>
+                            <div className="w-px h-6 bg-gray-800 mx-1"></div>
+                        </>
+                    )}
+
                     <UndoRedoButtons />
-
-
 
                     <LayoutSettings />
 

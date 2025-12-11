@@ -66,3 +66,78 @@ export async function deleteProfile(id: string): Promise<void> {
     throw new Error(data.error || 'Failed to delete profile');
   }
 }
+
+// Jobs API calls
+
+/**
+ * Get jobs with match scores for the current user's active profile
+ */
+export async function getMatchedJobs(): Promise<any[]> {
+  const response = await fetchWithAuth('/api/jobs/matched');
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to fetch matched jobs');
+  return data.jobs;
+}
+
+/**
+ * Force refresh match scores for the current user
+ */
+export async function refreshMatchScores(): Promise<{ scoresComputed: number }> {
+  const response = await fetchWithAuth('/api/jobs/refresh-scores', {
+    method: 'POST',
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to refresh scores');
+  return data;
+}
+
+/**
+ * Calculate ATS score for a specific job using current resume data (Draft Mode)
+ */
+export async function calculateDeepMatchScore(resumeData: any, jobDescription: string): Promise<{ score: number, missingKeywords: string[], criticalFeedback: string }> {
+  try {
+    const response = await fetchWithAuth('/api/tailor/score', {
+      method: 'POST',
+      body: JSON.stringify({
+        resumeData,
+        jobDescription
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to calculate deep match score');
+    }
+
+    const data = await response.json();
+    return data.data; // { score, missingKeywords, criticalFeedback }
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+}
+
+/**
+ * Get match score for a specific job (Stored/Pre-calc)
+ */
+export async function getJobScore(jobId: string): Promise<number> {
+  const response = await fetchWithAuth(`/api/jobs/${jobId}/score`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to fetch job score');
+  return data.match_score;
+}
+
+/**
+ * Get semantic match score using Server-Side Vector Embeddings
+ * High quality, but slower than client-side heuristic.
+ */
+export async function getVectorMatchScore(resumeText: string, jobDescription: string): Promise<number> {
+  const response = await fetchWithAuth('/api/tailor/vector-match', {
+    method: 'POST',
+    body: JSON.stringify({ resumeText, jobDescription })
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to calculate vector score');
+
+  return data.score;
+}

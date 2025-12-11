@@ -170,10 +170,14 @@ export interface Toast {
 }
 
 export interface Job {
+    id?: string;
     company: string;
     title: string;
     link: string;
     match_score: number;
     missing_skills: string[];
     summary: string;
+    description?: string;
+    location?: string;
+    created_at?: string;
 }

@@ -18,6 +18,7 @@ import tailorRoutes from './routes/tailor.js';
 import autofillRoutes from './routes/autofill.js';
 import scrapeRoutes from './routes/scrape.js';
 import applicationRoutes from './routes/applications.js';
+import jobRoutes from './routes/jobs.js';
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
@@ -56,6 +57,7 @@ app.use('/api/tailor', tailorRoutes);
 app.use('/api/autofill', autofillRoutes);
 app.use('/api/scrape', scrapeRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/jobs', jobRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

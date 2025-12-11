@@ -15,7 +15,7 @@ import { useSearchParams } from 'react-router-dom';
 type ViewMode = 'editor' | 'agents' | 'analytics' | 'tracker' | 'jobs' | 'profile';
 
 export const Layout = () => {
-    const [viewMode, setViewMode] = useState<ViewMode>('editor');
+    const [viewMode, setViewMode] = useState<ViewMode>('profile'); // Default to Profile/Home
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const { resume, dispatch } = useResume();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -52,12 +52,12 @@ export const Layout = () => {
         }
     }, [searchParams, dispatch, setSearchParams]);
 
-    // Only switch to editor once when tailoring STARTS
+    // Only switch to editor once when tailoring STARTS or JOB CHANGES
     useEffect(() => {
         if (resume.isTailoring && viewMode !== 'editor') {
             setViewMode('editor');
         }
-    }, [resume.isTailoring]); // Removed viewMode from deps to avoid constant locking
+    }, [resume.isTailoring, resume.tailoringJob]); // Added tailoringJob to detect job switch
 
     // Defaulting to "Dark Mode" / Technical Theme to match HeroRoaster
     const isDarkMode = true;
@@ -126,6 +126,7 @@ export const Layout = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 w-full px-2">
+                    <NavItem mode="profile" icon={LayoutDashboard} label="Home" />
                     <NavItem mode="editor" icon={FileText} label="Editor" />
                     <NavItem mode="jobs" icon={Briefcase} label="Jobs" />
                     <NavItem mode="tracker" icon={CheckSquare} label="Track" />
