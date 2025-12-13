@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
 import { generateCoverLetter } from '../../services/gemini';
-import { X, FileText, Copy, Check, Loader2, PenTool } from 'lucide-react';
+import { X, FileText, Copy, Check, Loader2, PenTool, Lightbulb } from 'lucide-react';
 
 interface CoverLetterModalProps {
     isOpen: boolean;
@@ -9,35 +9,59 @@ interface CoverLetterModalProps {
 }
 
 export const CoverLetterModal = ({ isOpen, onClose }: CoverLetterModalProps) => {
-    const { resume } = useResume();
+    const { resume, dispatch } = useResume();
     const [jobDescription, setJobDescription] = useState('');
+    const [jobTitle, setJobTitle] = useState('');
+    const [company, setCompany] = useState('');
     const [generatedLetter, setGeneratedLetter] = useState('');
+    const [companyInsight, setCompanyInsight] = useState('');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [error, setError] = useState('');
 
-    // Auto-fill JD from tailoring context if available
+    // Auto-fill from tailoring context if available
     useEffect(() => {
         if (isOpen && resume.tailoringJob) {
-            const { title, company, description, link } = resume.tailoringJob;
-            const composedDescription = `Role: ${title}\nCompany: ${company}\nLink: ${link || 'N/A'}\n\nJob Description:\n${description || ''}`;
-            setJobDescription(composedDescription.trim());
+            const { title, company: jobCompany, description } = resume.tailoringJob;
+            setJobTitle(title || '');
+            setCompany(jobCompany || '');
+            setJobDescription(description || '');
         }
     }, [isOpen, resume.tailoringJob]);
+
+    // Reset state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setGeneratedLetter('');
+            setCompanyInsight('');
+            setError('');
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleGenerate = async () => {
-        const jdToUse = resume.tailoringJob ?
-            `Role: ${resume.tailoringJob.title}\nCompany: ${resume.tailoringJob.company}\nDescription: ${resume.tailoringJob.description || jobDescription}`
-            : jobDescription;
+        if (!jobDescription.trim() || !company.trim()) {
+            setError('Please provide at least the company name and job description.');
+            return;
+        }
 
-        if (!jdToUse.trim()) return;
         setLoading(true);
+        setError('');
         try {
-            const letter = await generateCoverLetter(resume, jdToUse);
-            setGeneratedLetter(letter);
-        } catch (error) {
-            console.error(error);
+            const result = await generateCoverLetter(
+                resume,
+                jobDescription,
+                jobTitle || 'Target Role',
+                company
+            );
+            setGeneratedLetter(result.coverLetter);
+            setCompanyInsight(result.companyInsight || '');
+            // Store cover letter in context for autofill
+            dispatch({ type: 'SET_COVER_LETTER', payload: result.coverLetter });
+        } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : 'Failed to generate cover letter. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -75,29 +99,69 @@ export const CoverLetterModal = ({ isOpen, onClose }: CoverLetterModalProps) => 
                 <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
                     {!generatedLetter ? (
                         <div className="space-y-4">
+                            {/* Error message */}
+                            {error && (
+                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Job Title & Company - side by side */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-300">Job Title</label>
+                                    <input
+                                        type="text"
+                                        value={jobTitle}
+                                        onChange={(e) => setJobTitle(e.target.value)}
+                                        className="input-field w-full bg-[#1a1a1a] border-gray-700 text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
+                                        placeholder="e.g., Software Engineer"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-gray-300">Company *</label>
+                                    <input
+                                        type="text"
+                                        value={company}
+                                        onChange={(e) => setCompany(e.target.value)}
+                                        className="input-field w-full bg-[#1a1a1a] border-gray-700 text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
+                                        placeholder="e.g., Google"
+                                    />
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-300">Job Description</label>
+                                <label className="text-sm font-medium text-gray-300">Job Description *</label>
                                 <textarea
                                     value={jobDescription}
                                     onChange={(e) => setJobDescription(e.target.value)}
-                                    className="input-field w-full h-64 resize-none bg-[#1a1a1a] border-gray-700 text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
+                                    className="input-field w-full h-48 resize-none bg-[#1a1a1a] border-gray-700 text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-600"
                                     placeholder="Paste the full job description here..."
                                 />
                             </div>
+
+                            {/* Info box about AI research */}
+                            <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg flex gap-3">
+                                <Lightbulb className="text-indigo-400 shrink-0" size={18} />
+                                <p className="text-xs text-indigo-300">
+                                    Our AI will research the company to find recent news, initiatives, and values to personalize your cover letter with a compelling opening hook.
+                                </p>
+                            </div>
+
                             <button
                                 onClick={handleGenerate}
-                                disabled={loading || !jobDescription.trim()}
+                                disabled={loading || !jobDescription.trim() || !company.trim()}
                                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(79,70,229,0.3)]"
                             >
                                 {loading ? (
                                     <>
                                         <Loader2 className="animate-spin" size={20} />
-                                        <span>Crafting your letter...</span>
+                                        <span>Researching & crafting your letter...</span>
                                     </>
                                 ) : (
                                     <>
                                         <FileText size={20} />
-                                        <span>Generate Cover Letter</span>
+                                        <span>Generate Cover Letter (15 credits)</span>
                                     </>
                                 )}
                             </button>
@@ -107,12 +171,27 @@ export const CoverLetterModal = ({ isOpen, onClose }: CoverLetterModalProps) => 
                             <div className="flex justify-between items-center">
                                 <h3 className="text-sm font-medium text-gray-300">Generated Letter</h3>
                                 <button
-                                    onClick={() => setGeneratedLetter('')}
+                                    onClick={() => {
+                                        setGeneratedLetter('');
+                                        setCompanyInsight('');
+                                    }}
                                     className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
                                 >
                                     Create New
                                 </button>
                             </div>
+
+                            {/* Company insight panel */}
+                            {companyInsight && (
+                                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex gap-3">
+                                    <Lightbulb className="text-green-400 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs font-medium text-green-400 mb-1">Company Research Used:</p>
+                                        <p className="text-xs text-green-300">{companyInsight}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex-1 bg-[#1a1a1a] border border-gray-800 text-gray-300 p-6 rounded-lg shadow-inner overflow-y-auto whitespace-pre-wrap font-serif text-sm leading-relaxed custom-scrollbar">
                                 {generatedLetter}
                             </div>

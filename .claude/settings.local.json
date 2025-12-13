@@ -31,7 +31,15 @@
       "Bash(taskkill:*)",
       "WebSearch",
       "WebFetch(domain:google.github.io)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:toonformat.dev)",
+      "Bash(pnpm build:shared:*)",
+      "Bash(pnpm build:extension:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm build:backend:*)",
+      "Bash(pnpm dev:backend:*)"
     ],
     "deny": [],
     "ask": []

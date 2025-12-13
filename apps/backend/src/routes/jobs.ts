@@ -24,6 +24,7 @@ function getSupabase(): SupabaseClient {
 /**
  * GET /api/jobs/matched
  * Get jobs sorted by match score for the current user's active profile
+ * Auto-generates embedding if profile has content but no embedding yet
  */
 router.get('/matched', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -34,12 +35,37 @@ router.get('/matched', authenticateToken, async (req: Request, res: Response) =>
       return;
     }
 
+    // Check if user's active profile needs embedding generation
+    const { data: profile } = await getSupabase()
+      .from('profiles')
+      .select('id, data, embedding')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    // If profile exists, has data, but no embedding - try to generate one
+    if (profile && profile.data && !profile.embedding) {
+      console.log('[Jobs] Profile has no embedding, attempting to generate...');
+      try {
+        const generated = await updateProfileEmbedding(profile.id, profile.data);
+        if (generated) {
+          console.log('[Jobs] Successfully generated embedding for profile', profile.id);
+        } else {
+          console.log('[Jobs] Profile does not have enough content for embedding yet');
+        }
+      } catch (embError) {
+        console.error('[Jobs] Failed to generate embedding:', embError);
+        // Continue anyway - will return jobs without scores
+      }
+    }
+
     const jobs = await getMatchedJobsForUser(userId);
 
     res.json({
       success: true,
       jobs,
       count: jobs.length,
+      hasEmbedding: !!profile?.embedding,
     });
   } catch (error) {
     console.error('Error fetching matched jobs:', error);

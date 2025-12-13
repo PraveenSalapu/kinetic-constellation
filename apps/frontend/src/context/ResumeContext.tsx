@@ -33,6 +33,7 @@ type ResumeAction =
     | { type: 'APPLY_LAYOUT'; payload: Resume['layout'] }
     | { type: 'SET_SCAN_RESULTS'; payload: AtsScan }
     | { type: 'UPDATE_DEMOGRAPHICS'; payload: Demographics }
+    | { type: 'SET_COVER_LETTER'; payload: string }
     | { type: 'UNDO' }
     | { type: 'REDO' };
 
@@ -157,6 +158,10 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
             newState = { ...state, demographics: action.payload };
             return saveToHistory(newState);
 
+        case 'SET_COVER_LETTER':
+            // Don't save to history, just update the cover letter
+            return { ...state, generatedCoverLetter: action.payload };
+
         case 'UNDO':
             const history = state.history || [];
             const historyIndex = state.historyIndex ?? -1;
@@ -190,63 +195,84 @@ const resumeReducer = (state: ResumeState, action: ResumeAction): ResumeState =>
     }
 };
 
-import { getActiveProfileSync, updateActiveProfileData, getProfileFromApi } from '../services/storage';
+import { updateActiveProfileData, getProfileFromApi } from '../services/storage';
+import { useAuth } from './AuthContext';
 
 export const ResumeProvider = ({ children }: { children: ReactNode }) => {
-    const [resume, dispatch] = useReducer(resumeReducer, initialResume, () => {
-        // Optimistic initialization from local storage for instant render
-        try {
-            // Fallback to initial if local is empty or error
-            const activeProfile = getActiveProfileSync();
-            const profileData = activeProfile.data;
+    const [resume, dispatch] = useReducer(resumeReducer, { ...initialResume, history: [], historyIndex: -1 } as ResumeState);
+    const { user, isLoading: authLoading } = useAuth();
 
-            const migratedLayout = profileData.layout && typeof profileData.layout.fontSize === 'number'
-                ? profileData.layout
-                : initialResume.layout;
+    // Track the user ID that was last hydrated for to prevent unnecessary re-hydration
+    const lastHydratedUserId = React.useRef<string | null>(null);
 
-            const migratedTemplate = (profileData as any).selectedTemplate || 'modern';
-
-            return {
-                ...initialResume,
-                ...profileData,
-                selectedTemplate: migratedTemplate,
-                layout: migratedLayout
-            } as ResumeState;
-        } catch (error) {
-            return { ...initialResume, selectedTemplate: 'modern' } as ResumeState;
-        }
-    });
-
-    // Hydrate from API if authenticated
+    // Hydrate from API when authenticated
+    // Re-hydrate only when user actually changes (login/logout/switch)
     useEffect(() => {
+        // Wait for auth to finish loading
+        if (authLoading) return;
+
+        // No user = not authenticated, don't hydrate (auth required)
+        if (!user) {
+            console.log('[ResumeContext] No user, skipping hydration');
+            return;
+        }
+
+        const currentUserId = user.id;
+
+        // Skip hydration if we already hydrated for this user
+        if (lastHydratedUserId.current === currentUserId) {
+            console.log('[ResumeContext] Skipping hydration - already hydrated for user:', currentUserId);
+            return;
+        }
+
         const hydrate = async () => {
-            const token = localStorage.getItem('accessToken');
-            if (token) {
-                try {
-                    const apiProfile = await getProfileFromApi();
-                    if (apiProfile) {
-                        const profileData = apiProfile.data;
-                        // Check if API data is different/newer? 
-                        // For now, let's assume API is source of truth on load
-                        dispatch({ type: 'SET_RESUME', payload: profileData });
-                    }
-                } catch (e) {
-                    console.error("Failed to hydrate from API", e);
+            try {
+                // Fetch from DB (API)
+                console.log('[ResumeContext] Hydrating from API for user:', user.email);
+                const apiProfile = await getProfileFromApi(user.id);
+                if (apiProfile) {
+                    console.log('[ResumeContext] Found profile, setting resume data');
+                    dispatch({ type: 'SET_RESUME', payload: apiProfile.data });
+                } else {
+                    // No profile exists yet - reset to initial state
+                    console.log('[ResumeContext] No profile found, using initial state');
+                    dispatch({ type: 'RESET_RESUME' });
                 }
+                lastHydratedUserId.current = user.id;
+            } catch (e) {
+                console.error("[ResumeContext] Failed to hydrate from API", e);
+                dispatch({ type: 'RESET_RESUME' });
+                lastHydratedUserId.current = user.id;
             }
         };
         hydrate();
-    }, []);
+    }, [user, authLoading]); // Re-run when user changes
 
     // Save changes to the active profile whenever resume state changes
+    // Use a ref to track the last saved state to prevent redundant loops
+    const lastSavedState = React.useRef<string>(JSON.stringify(initialResume));
+
     useEffect(() => {
         if (resume.isTailoring) {
             return;
         }
 
+        const currentState = JSON.stringify(resume);
+        if (currentState === lastSavedState.current) {
+            return;
+        }
+
         const handler = setTimeout(async () => {
             try {
-                await updateActiveProfileData(resume);
+                const savedResume = await updateActiveProfileData(resume, user?.id);
+
+                // If ID changed (self-healing), update context seamlessly
+                if (savedResume && savedResume.id !== resume.id) {
+                    console.log('[ResumeContext] Updating ID after autosave healing:', savedResume.id);
+                    dispatch({ type: 'SET_RESUME', payload: savedResume });
+                }
+
+                lastSavedState.current = currentState;
             } catch (error) {
                 console.error('Failed to save resume to storage:', error);
             }

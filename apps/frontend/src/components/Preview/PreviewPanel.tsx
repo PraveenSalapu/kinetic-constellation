@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { getDatabase } from '../../services/database/mongodb';
 import { v4 } from 'uuid';
 import { fetchWithAuth } from '../../services/api';
-import { getActiveProfileSync } from '../../services/storage';
+import { getActiveProfile } from '../../services/storage';
 
 export const PreviewPanel = () => {
     const { resume, dispatch } = useResume();
@@ -91,7 +91,7 @@ export const PreviewPanel = () => {
 
         setIsApplyingToJob(true);
         try {
-            const profile = getActiveProfileSync();
+            const profile = await getActiveProfile();
             if (!profile?.id) {
                 addToast('error', 'No active profile found');
                 return;
@@ -106,6 +106,7 @@ export const PreviewPanel = () => {
                     company: resume.tailoringJob?.company || '',
                     jobDescription: resume.tailoringJob?.description || '',
                     tailoredResume: resume,
+                    coverLetter: resume.generatedCoverLetter || undefined,
                 }),
             });
 

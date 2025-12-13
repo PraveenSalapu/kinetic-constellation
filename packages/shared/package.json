@@ -12,6 +12,14 @@
     "./types": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/types/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants/index.d.ts",
+      "import": "./dist/constants/index.js"
     }
   },
   "scripts": {
@@ -20,5 +28,8 @@
   },
   "devDependencies": {
     "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0"
   }
 }

@@ -3,16 +3,17 @@
 
 import { detectJobPage, getPlatformInfo } from './detector';
 import { scrapeJobData, quickScrape } from './scraper';
-import { detectFormFields, fillFormFields, quickFill, getFieldsSummary, uploadFileToInput, getResumeFileInputs } from './autofill';
-import type { Resume } from '@careerflow/shared';
+import { detectFormFields, fillFormFields, quickFill, getFieldsSummary, uploadFileToInput, getResumeFileInputs, detectEssayQuestions, fillEssayField, fillCoverLetter } from './autofill';
+import type { Resume, EssayQuestion, EssayResponse } from '@careerflow/shared';
 
 // Global state
 let widgetInjected = false;
 let modalInjected = false;
-let pendingAutofill: { id: string; tailoredResume: any } | null = null;
+let pendingAutofill: { id: string; profileId: string; tailoredResume: any; coverLetter?: string | null } | null = null;
 
-// App URL for redirecting to tailor
-const APP_URL = 'http://localhost:5173';
+// App URL - injected at build time via Vite's define or falls back to localhost
+declare const __APP_URL__: string | undefined;
+const APP_URL = typeof __APP_URL__ !== 'undefined' ? __APP_URL__ : 'http://localhost:5173';
 
 // Initialize on page load
 async function initialize(): Promise<void> {
@@ -29,15 +30,22 @@ async function initialize(): Promise<void> {
     }
 
     // Check if we're logged in
-    const auth = await chrome.storage.sync.get('authToken');
+    const auth = await chrome.storage.sync.get(['authToken', 'user']);
+    console.log('[CareerFlow] Auth check:', { hasToken: !!auth.authToken, user: auth.user?.email });
     if (!auth.authToken) {
-      console.log('[CareerFlow] Not logged in, widget disabled');
+      console.log('[CareerFlow] Not logged in, widget disabled. Please log in via the extension popup or visit the CareerFlow app.');
+      // Still start the observer so we can detect if user logs in later
+      startObserver();
       return;
     }
 
-    // Detect if this is a job page
+
+    // Start the mutation observer for SPA support
+    startObserver();
+
+    // Check for pending autofill from the app
     const detection = detectJobPage();
-    console.log('[CareerFlow] Detection result:', detection);
+    console.log('[CareerFlow] Page detection:', detection);
 
     if (detection.isJobPage && detection.confidence >= 40) {
       // Check for pending autofill from the app
@@ -48,6 +56,125 @@ async function initialize(): Promise<void> {
   } catch (error) {
     console.error('[CareerFlow] Initialization error:', error);
   }
+}
+
+// Re-run detection on dynamic content changes (SPA support)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let observer: MutationObserver | null = null;
+
+function startObserver(): void {
+  if (observer || !document.body) return;
+
+  observer = new MutationObserver(() => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      if (!widgetInjected) {
+        try {
+          // Check auth before detecting
+          const auth = await chrome.storage.sync.get('authToken');
+          if (!auth.authToken) return;
+
+          const detection = detectJobPage();
+          if (detection.isJobPage && detection.confidence >= 40) {
+            injectWidget(detection.platform || 'generic');
+          }
+        } catch (error) {
+          console.error('[CareerFlow] Observer detection error:', error);
+        }
+      }
+    }, 1000); // Wait 1s after changes stop
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// Listen for manual scan request from popup
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'PING') {
+    sendResponse({ status: 'ok' });
+  } else if (message.type === 'SCAN_PAGE') {
+    console.log('[CareerFlow] Manual scan requested');
+    const detection = detectJobPage();
+
+    // FORCE inject on manual scan, even if detection low confidence
+    // Use detected platform or default to generic
+    const platform = detection.platform || 'generic';
+    injectWidget(platform);
+
+    sendResponse({ success: true, detection: { ...detection, isJobPage: true } });
+  }
+  return true;
+});
+
+// Check if current page is the CareerFlow app
+function isCareerFlowApp(): boolean {
+  const url = window.location.href;
+  // Check against configured APP_URL (handles production domains)
+  if (APP_URL && url.startsWith(APP_URL)) return true;
+  // Fallback checks for dev and known domains
+  return url.includes('localhost:5173') || url.includes('careerflow');
+}
+
+// Sync session from the main web app
+async function syncSession(): Promise<boolean> {
+  // Check if we are on the main app
+  if (!isCareerFlowApp()) return false;
+
+  console.log('[CareerFlow] Detected App URL, attempting to sync session...');
+
+  try {
+    // Find Supabase token in localStorage
+    // Key format: sb-<project-ref>-auth-token
+    let sessionData = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const value = localStorage.getItem(key);
+        if (value) {
+          try {
+            sessionData = JSON.parse(value);
+            break;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+
+    if (sessionData) {
+      console.log('[CareerFlow] Found session data, syncing...');
+      await chrome.runtime.sendMessage({
+        type: 'SYNC_SESSION',
+        session: sessionData
+      });
+      console.log('[CareerFlow] Session synced successfully!');
+      return true;
+    }
+  } catch (err) {
+    console.error('[CareerFlow] Error syncing session:', err);
+  }
+  return false;
+}
+
+// Initialize on page load
+// Also run sync immediately if on app, and keep checking until found
+if (isCareerFlowApp()) {
+  // Initial check
+  syncSession();
+
+  // Poll every 2 seconds to catch login/logout events
+  // This is necessary because localStorage events don't fire on the same tab
+  const syncInterval = setInterval(async () => {
+    const success = await syncSession();
+    if (success) {
+      // If we synced successfully, we can slow down or stop polling
+      // But keeping it running allows catching logout/account switching
+      // clearInterval(syncInterval);
+    }
+  }, 2000);
+
+  // Clean up on unload
+  window.addEventListener('unload', () => clearInterval(syncInterval));
 }
 
 // Check if there's a pending autofill for this URL
@@ -63,7 +190,9 @@ async function checkForPendingAutofill(): Promise<void> {
       console.log('[CareerFlow] Found pending autofill!', response.autofill);
       pendingAutofill = {
         id: response.autofill.id,
+        profileId: response.autofill.profileId,
         tailoredResume: response.autofill.tailoredResume,
+        coverLetter: response.autofill.coverLetter || null,
       };
 
       // Show notification that we'll auto-fill
@@ -143,17 +272,33 @@ async function autoFillWithPendingData(): Promise<void> {
     const result = await fillFormFields(resume);
     console.log('[CareerFlow] Auto-filled with pending data:', result);
 
-    // Try to upload resume PDF
+    // Fill cover letter if available
+    if (pendingAutofill.coverLetter) {
+      console.log('[CareerFlow] Filling cover letter field...');
+      const coverLetterFilled = await fillCoverLetter(pendingAutofill.coverLetter);
+      if (coverLetterFilled) {
+        console.log('[CareerFlow] Cover letter filled successfully!');
+      } else {
+        console.log('[CareerFlow] No cover letter field found or fill failed');
+      }
+    }
+
+    // Try to upload the tailored resume PDF
     const fileInputs = getResumeFileInputs();
     if (fileInputs.length > 0) {
-      // Get the profile ID from the tailored resume
+      console.log('[CareerFlow] Fetching tailored PDF for autofill:', pendingAutofill.id);
+      // Use the new tailored PDF endpoint which generates PDF from the stored tailored resume
       const pdfResponse = await chrome.runtime.sendMessage({
-        type: 'GET_RESUME_PDF',
-        profileId: pendingAutofill.id, // Use autofill ID to get the right profile
+        type: 'GET_TAILORED_PDF',
+        autofillId: pendingAutofill.id,
       });
 
       if (pdfResponse.pdf && pdfResponse.filename) {
-        await uploadFileToInput(pdfResponse.pdf, pdfResponse.filename, 'application/pdf');
+        console.log('[CareerFlow] Uploading tailored PDF:', pdfResponse.filename);
+        const uploadResult = await uploadFileToInput(pdfResponse.pdf, pdfResponse.filename, 'application/pdf');
+        console.log('[CareerFlow] PDF upload result:', uploadResult);
+      } else if (pdfResponse.error) {
+        console.error('[CareerFlow] Failed to get tailored PDF:', pdfResponse.error);
       }
     }
 
@@ -164,7 +309,10 @@ async function autoFillWithPendingData(): Promise<void> {
     });
 
     // Show success message
-    showSuccessToast('✅ Application auto-filled with your tailored resume!');
+    const hasCoverLetter = !!pendingAutofill.coverLetter;
+    showSuccessToast(hasCoverLetter
+      ? '✅ Application auto-filled with resume & cover letter!'
+      : '✅ Application auto-filled with your tailored resume!');
 
     pendingAutofill = null;
   } catch (error) {
@@ -570,6 +718,172 @@ async function showModal(platform: string): Promise<void> {
     .cf-collapsible-content {
       margin-top: 8px;
     }
+
+    /* Essay UI Styles */
+    .cf-essay-section {
+      margin-top: 16px;
+      border-top: 1px solid #374151;
+      padding-top: 16px;
+    }
+
+    .cf-essay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .cf-essay-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #9ca3af;
+    }
+
+    .cf-btn-generate {
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cf-btn-generate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .cf-btn-generate:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .cf-essay-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .cf-essay-card {
+      background: #374151;
+      border-radius: 8px;
+      padding: 12px;
+      border: 1px solid #4b5563;
+    }
+    .cf-essay-card.skipped {
+      opacity: 0.5;
+    }
+    .cf-essay-card.low-confidence {
+      border-color: #f59e0b;
+    }
+
+    .cf-essay-question {
+      font-size: 13px;
+      color: #d1d5db;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .cf-essay-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .cf-status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    .cf-status-badge.pending {
+      background: #6b728033;
+      color: #9ca3af;
+    }
+    .cf-status-badge.generating {
+      background: #3b82f633;
+      color: #60a5fa;
+    }
+    .cf-status-badge.ready {
+      background: #22c55e33;
+      color: #22c55e;
+    }
+    .cf-status-badge.error {
+      background: #ef444433;
+      color: #ef4444;
+    }
+
+    .cf-essay-response {
+      width: 100%;
+      min-height: 100px;
+      padding: 10px;
+      background: #1f2937;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      color: #f3f4f6;
+      font-size: 12px;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .cf-essay-response:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .cf-essay-response::placeholder {
+      color: #6b7280;
+    }
+
+    .cf-essay-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .cf-essay-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .cf-essay-skip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: #9ca3af;
+      cursor: pointer;
+    }
+    .cf-essay-skip input {
+      cursor: pointer;
+    }
+
+    .cf-confidence-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .cf-confidence-indicator.high { color: #22c55e; }
+    .cf-confidence-indicator.medium { color: #f59e0b; }
+    .cf-confidence-indicator.low { color: #ef4444; }
+
+    .cf-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #374151;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: cf-spin 0.8s linear infinite;
+    }
+    @keyframes cf-spin {
+      to { transform: rotate(360deg); }
+    }
   `;
   shadow.appendChild(styles);
 
@@ -579,8 +893,12 @@ async function showModal(platform: string): Promise<void> {
   // Get detected fields
   const fieldsSummary = getFieldsSummary();
 
+  // Detect essay questions
+  const essayQuestions = detectEssayQuestions();
+  console.log('[CareerFlow] Detected essay questions:', essayQuestions);
+
   // Check if scraping failed
-  const scrapedJob = await scrapeJobData();
+  const scrapedJob = await scrapeJobData(platform);
   const scrapeFailed = !scrapedJob.description ||
     scrapedJob.description === 'No description available' ||
     scrapedJob.description.length < 100;
@@ -650,6 +968,42 @@ async function showModal(platform: string): Promise<void> {
             ${fieldsSummary.length === 0 ? '<div style="color: #9ca3af; text-align: center; padding: 16px;">No fillable fields detected</div>' : ''}
           </div>
         </div>
+
+        ${essayQuestions.length > 0 ? `
+        <div class="cf-essay-section" id="cf-essay-section">
+          <div class="cf-essay-header">
+            <div class="cf-essay-title">Essay Questions (${essayQuestions.length})</div>
+            <button class="cf-btn-generate" id="cf-generate-essays-btn">
+              🤖 Generate AI Responses
+            </button>
+          </div>
+          <div class="cf-essay-list" id="cf-essay-list">
+            ${essayQuestions.map(q => `
+              <div class="cf-essay-card" data-question-id="${q.id}" data-selector="${escapeHtml(q.fieldSelector)}">
+                <div class="cf-essay-question">${escapeHtml(q.question.substring(0, 200))}${q.question.length > 200 ? '...' : ''}</div>
+                <div class="cf-essay-status">
+                  <span class="cf-status-badge pending">Pending</span>
+                  ${q.required ? '<span style="color: #ef4444; font-size: 11px;">*Required</span>' : ''}
+                </div>
+                <textarea class="cf-essay-response" placeholder="Click 'Generate AI Responses' to fill this..." data-question-id="${q.id}"></textarea>
+                <div class="cf-essay-meta">
+                  <span class="cf-word-count">0 words</span>
+                  ${q.maxLength ? `<span>/ ${q.maxLength} chars max</span>` : ''}
+                </div>
+                <div class="cf-essay-actions">
+                  <label class="cf-essay-skip">
+                    <input type="checkbox" data-question-id="${q.id}">
+                    Skip this question
+                  </label>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <button class="cf-btn-generate" id="cf-regenerate-essays-btn" style="margin-top: 12px; width: 100%; display: none;">
+            🔄 Regenerate All Responses
+          </button>
+        </div>
+        ` : ''}
 
         <div style="display: flex; gap: 12px; flex-direction: column;">
           <button class="cf-btn cf-btn-primary" id="cf-autofill-btn" ${fieldsSummary.length === 0 ? 'disabled' : ''}>
@@ -783,6 +1137,141 @@ async function showModal(platform: string): Promise<void> {
     const manualDescription = manualDescInput?.value?.trim();
     await handleTailorResume(shadow, platform, jobInfo, manualDescription);
   });
+
+  // Essay generation button handlers
+  const generateEssaysBtn = shadow.getElementById('cf-generate-essays-btn');
+  const regenerateEssaysBtn = shadow.getElementById('cf-regenerate-essays-btn');
+
+  const handleEssayGeneration = async () => {
+    const profileSelect = shadow.getElementById('cf-profile-select') as HTMLSelectElement;
+    if (!profileSelect?.value) {
+      alert('Please select a profile first');
+      return;
+    }
+
+    // Get job description
+    const manualDescInput = shadow.getElementById('cf-manual-description') as HTMLTextAreaElement;
+    const jobDescription = manualDescInput?.value?.trim() || scrapedJob.description || '';
+
+    if (jobDescription.length < 50) {
+      alert('Job description is too short. Please paste the job description manually.');
+      return;
+    }
+
+    // Update UI to show generating state
+    const essayCards = shadow.querySelectorAll('.cf-essay-card');
+    essayCards.forEach(card => {
+      const badge = card.querySelector('.cf-status-badge');
+      if (badge) {
+        badge.className = 'cf-status-badge generating';
+        badge.innerHTML = '<span class="cf-spinner"></span> Generating...';
+      }
+    });
+
+    if (generateEssaysBtn) {
+      (generateEssaysBtn as HTMLButtonElement).disabled = true;
+      generateEssaysBtn.textContent = '⏳ Generating...';
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'GENERATE_ESSAYS',
+        profileId: profileSelect.value,
+        jobDescription,
+        jobTitle: jobInfo.title,
+        company: jobInfo.company,
+        questions: essayQuestions,
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      // Populate responses into the textareas
+      const essayResponses = response.responses as EssayResponse[];
+      essayResponses.forEach(r => {
+        const card = shadow.querySelector(`.cf-essay-card[data-question-id="${r.questionId}"]`);
+        if (!card) return;
+
+        const textarea = card.querySelector('.cf-essay-response') as HTMLTextAreaElement;
+        const badge = card.querySelector('.cf-status-badge');
+        const wordCount = card.querySelector('.cf-word-count');
+
+        if (textarea) {
+          textarea.value = r.response;
+          textarea.placeholder = 'Edit the generated response as needed...';
+        }
+
+        if (badge) {
+          badge.className = 'cf-status-badge ready';
+          badge.textContent = 'Ready';
+        }
+
+        if (wordCount) {
+          wordCount.textContent = `${r.wordCount} words`;
+        }
+
+        // Mark low confidence responses
+        if (r.confidence < 60) {
+          card.classList.add('low-confidence');
+        }
+      });
+
+      // Show regenerate button, hide generate button
+      if (generateEssaysBtn) generateEssaysBtn.style.display = 'none';
+      if (regenerateEssaysBtn) regenerateEssaysBtn.style.display = 'block';
+
+      console.log('[CareerFlow] Essay responses generated:', essayResponses);
+
+    } catch (error) {
+      console.error('[CareerFlow] Essay generation error:', error);
+
+      // Update UI to show error
+      essayCards.forEach(card => {
+        const badge = card.querySelector('.cf-status-badge');
+        if (badge) {
+          badge.className = 'cf-status-badge error';
+          badge.textContent = 'Error';
+        }
+      });
+
+      alert(`Failed to generate essays: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      if (generateEssaysBtn) {
+        (generateEssaysBtn as HTMLButtonElement).disabled = false;
+        generateEssaysBtn.textContent = '🤖 Generate AI Responses';
+      }
+    }
+  };
+
+  generateEssaysBtn?.addEventListener('click', handleEssayGeneration);
+  regenerateEssaysBtn?.addEventListener('click', handleEssayGeneration);
+
+  // Update word count on essay textarea input
+  const essayTextareas = shadow.querySelectorAll('.cf-essay-response');
+  essayTextareas.forEach(textarea => {
+    textarea.addEventListener('input', (e) => {
+      const target = e.target as HTMLTextAreaElement;
+      const card = target.closest('.cf-essay-card');
+      const wordCount = card?.querySelector('.cf-word-count');
+      if (wordCount) {
+        const words = target.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+        wordCount.textContent = `${words} words`;
+      }
+    });
+  });
+
+  // Skip checkbox handler
+  const skipCheckboxes = shadow.querySelectorAll('.cf-essay-skip input');
+  skipCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      const card = target.closest('.cf-essay-card');
+      if (card) {
+        card.classList.toggle('skipped', target.checked);
+      }
+    });
+  });
 }
 
 // Handle "Tailor Resume" - scrape job, save to DB, redirect to app
@@ -798,7 +1287,7 @@ async function handleTailorResume(
 
   try {
     // Scrape full job details
-    const fullJobData = await scrapeJobData();
+    const fullJobData = await scrapeJobData(platform);
     const currentUrl = window.location.href;
 
     // Use manual description if provided, otherwise use scraped
@@ -1010,11 +1499,31 @@ async function handleAutoFill(shadow: ShadowRoot, platform: string): Promise<voi
       }
     }
 
+    // Fill essay fields if any were generated
+    let essaysFilled = 0;
+    const essayCards = shadow.querySelectorAll('.cf-essay-card');
+    for (const card of essayCards) {
+      // Skip if marked as skipped
+      if (card.classList.contains('skipped')) continue;
+
+      const textarea = card.querySelector('.cf-essay-response') as HTMLTextAreaElement;
+      const selector = card.getAttribute('data-selector');
+
+      if (textarea?.value && selector) {
+        progressText.textContent = `Filling essay question...`;
+        const filled = fillEssayField(selector, textarea.value);
+        if (filled) essaysFilled++;
+      }
+    }
+
     // Show completion status
     progressFill.style.width = '100%';
     progress.style.display = 'none';
 
     const statusParts = [`✓ Filled ${result.filled}/${result.total} fields`];
+    if (essaysFilled > 0) {
+      statusParts.push(`+ ${essaysFilled} essays`);
+    }
     if (resumeUploaded) {
       statusParts.push('+ Resume uploaded');
     }

@@ -11,6 +11,12 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
+// Import config
+import config, { validateEnvironment } from './config/environment.js';
+
+// Validate environment variables at startup
+validateEnvironment();
+
 // Import routes after env is loaded
 // Authorization routes removed (Supabase Native Auth)
 import profileRoutes from './routes/profiles.js';
@@ -19,19 +25,14 @@ import autofillRoutes from './routes/autofill.js';
 import scrapeRoutes from './routes/scrape.js';
 import applicationRoutes from './routes/applications.js';
 import jobRoutes from './routes/jobs.js';
+import creditRoutes from './routes/credits.js';
 
 const app: express.Application = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.port;
 
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:5173',  // Vite dev server
-    'http://localhost:5174',  // Vite dev server (alt port)
-    'http://localhost:5175',  // Vite dev server (alt port 2)
-    'http://localhost:4173',  // Vite preview
-    /^chrome-extension:\/\/.*/,  // Chrome extension
-  ],
+  origin: config.corsOrigins,
   credentials: true,
 }));
 
@@ -40,7 +41,7 @@ app.use(express.json({ limit: '10mb' }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // Increase limit for development/extensive usage
   message: { error: 'Too many requests, please try again later' },
 });
 app.use('/api/', limiter);
@@ -58,6 +59,7 @@ app.use('/api/autofill', autofillRoutes);
 app.use('/api/scrape', scrapeRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/credits', creditRoutes);
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

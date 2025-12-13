@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { X, Wand2, Loader2, Lightbulb, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRealtimeMatch } from '../../hooks/useRealtimeMatch';
 import { useResume } from '../../context/ResumeContext';
+import { useAuth } from '../../context/AuthContext';
 import { tailorResume } from '../../services/gemini';
-import type { TailorResponse } from '../../types';
+import type { TailorResponse, Resume } from '../../types';
 import { useToast } from '../../context/ToastContext';
 import ErrorBoundary from '../ErrorBoundary';
 
@@ -15,6 +16,7 @@ interface TailorModalProps {
 
 export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }: TailorModalProps) => {
     const { resume, dispatch } = useResume();
+    const { credits, refreshCredits } = useAuth();
     const { addToast } = useToast();
     const [jobDescription, setJobDescription] = useState(initialJD);
     const [isTailoring, setIsTailoring] = useState(false);
@@ -22,7 +24,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
     const [tailorResult, setTailorResult] = useState<TailorResponse | null>(null);
     const [showReasoning, setShowReasoning] = useState(true);
     const [selectedImprovements, setSelectedImprovements] = useState<{
-        experience: { [key: string]: { revised: number[], recommended: number[] } },
+        experience: { [key: string]: { revised: number[], suggested: number[], dropped: number[] } },
         projects: number[]
     }>({ experience: {}, projects: [] });
     const [jobUrl, setJobUrl] = useState('');
@@ -64,7 +66,8 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
             tailorResult.improvedExperience?.forEach(exp => {
                 initialSelection.experience[exp.experienceId] = {
                     revised: exp.revisedBullets?.map((_, i) => i) || [],
-                    recommended: exp.recommendedBullets?.map((_, i) => i) || []
+                    suggested: exp.suggestedAdditions?.map((_, i) => i) || [], // Renamed from recommended
+                    dropped: exp.bulletsToDrop?.map((_, i) => i) || [] // New: drop selection
                 };
             });
 
@@ -93,16 +96,16 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         setTailorResult(null);
 
         try {
-            // Keep IDs so the AI can map experience items back to their source
-            // Filter out UI-only fields like isVisible and order
-            const resumeContent = JSON.stringify(resume, (key, value) => {
-                if (key === 'isVisible' || key === 'order') return undefined;
-                return value;
-            }, 2);
+            // Use TOON format for ~40-60% token savings
+            // The tailorResume function handles TOON encoding internally
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { history, historyIndex, ...resumeWithoutHistory } = resume as any;
+            const resumeForTailor = resumeWithoutHistory as Resume;
 
-            const result = await tailorResume(resumeContent, jobDescription);
+            const result = await tailorResume(resumeForTailor, jobDescription);
             setTailorResult(result);
             addToast('success', 'Resume analyzed successfully');
+            refreshCredits(); // Refresh balance after spending
         } catch (err: any) {
             console.error(err);
             const msg = err.message || 'Failed to tailor resume. Please try again.';
@@ -113,9 +116,9 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
     };
 
-    const toggleExperienceSelection = (expId: string, type: 'revised' | 'recommended', index: number) => {
+    const toggleExperienceSelection = (expId: string, type: 'revised' | 'suggested' | 'dropped', index: number) => {
         setSelectedImprovements(prev => {
-            const current = prev.experience[expId] || { revised: [], recommended: [] };
+            const current = prev.experience[expId] || { revised: [], suggested: [], dropped: [] };
             const list = current[type];
             const newList = list.includes(index)
                 ? list.filter(i => i !== index)
@@ -147,11 +150,61 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
 
         // 1. Update Skills
         let newSkills = [...resume.skills];
+
+        // CATEGORY NORMALIZATION MAPPING
+        // Maps various potential AI outputs to our 5 standard categories
+        const CATEGORY_MAP: Record<string, string> = {
+            // 1. Programming Languages
+            'python': 'Programming Languages', 'java': 'Programming Languages', 'javascript': 'Programming Languages',
+            'typescript': 'Programming Languages', 'c#': 'Programming Languages', 'sql': 'Programming Languages',
+            'go': 'Programming Languages', 'languages': 'Programming Languages', 'coding': 'Programming Languages',
+
+            // 2. Cloud & Infrastructure
+            'aws': 'Cloud & Infrastructure', 'amazon web services': 'Cloud & Infrastructure',
+            'azure': 'Cloud & Infrastructure', 'gcp': 'Cloud & Infrastructure', 'cloud': 'Cloud & Infrastructure',
+            'infrastructure': 'Cloud & Infrastructure', 'infrastructure as code': 'Cloud & Infrastructure',
+
+            // 3. Frameworks & Architecture
+            'frameworks': 'Frameworks & Architecture', 'architecture': 'Frameworks & Architecture',
+            'spring': 'Frameworks & Architecture', '.net': 'Frameworks & Architecture',
+            'react': 'Frameworks & Architecture', 'node': 'Frameworks & Architecture',
+            'microservices': 'Frameworks & Architecture', 'system design': 'Frameworks & Architecture',
+
+            // 4. DevOps & AI
+            'devops': 'DevOps & AI', 'cicd': 'DevOps & AI', 'containers': 'DevOps & AI',
+            'kubernetes': 'DevOps & AI', 'docker': 'DevOps & AI', 'ai': 'DevOps & AI',
+            'artificial intelligence': 'DevOps & AI', 'machine learning': 'DevOps & AI',
+            'mlops': 'DevOps & AI', 'genai': 'DevOps & AI',
+
+            // 5. Tools & Platforms
+            'tools': 'Tools & Platforms', 'platforms': 'Tools & Platforms',
+            'databases': 'Tools & Platforms', 'testing': 'Tools & Platforms',
+            'monitoring': 'Tools & Platforms', 'ide': 'Tools & Platforms',
+            'software': 'Tools & Platforms'
+        };
+
+        const normalizeCategory = (cat: string) => {
+            if (!cat) return 'Skills';
+            const lower = cat.toLowerCase().trim();
+            // 1. Direct Map Check
+            if (CATEGORY_MAP[lower]) return CATEGORY_MAP[lower];
+            // 2. Partial Match Check (e.g. "AWS Services" -> "Cloud...")
+            const keys = Object.keys(CATEGORY_MAP);
+            for (const k of keys) {
+                if (lower.includes(k)) return CATEGORY_MAP[k];
+            }
+            // 3. Fallback: Title Case the original
+            return cat.charAt(0).toUpperCase() + cat.slice(1);
+        };
+
         if (missingHardSkills && missingHardSkills.length > 0) {
             missingHardSkills.forEach(skill => {
+                const rawCategory = skill.category || 'Skills';
+                const targetCategoryName = normalizeCategory(rawCategory);
+
                 // Find matching category (case-insensitive)
                 const existingCategoryIndex = newSkills.findIndex(s =>
-                    (s.category || '').toLowerCase().trim() === (skill.category || '').toLowerCase().trim()
+                    (s.category || '').toLowerCase().trim() === targetCategoryName.toLowerCase().trim()
                 );
 
                 if (existingCategoryIndex >= 0) {
@@ -166,7 +219,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                     // Create new category
                     newSkills.push({
                         id: crypto.randomUUID(),
-                        category: skill.category,
+                        category: targetCategoryName,
                         items: [skill.name]
                     });
                 }
@@ -181,15 +234,32 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                 if (index !== -1) {
                     let currentBullets = [...newExperience[index].description];
                     const selections = selectedImprovements.experience[update.experienceId];
+                    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,;]$/, '');
 
-                    // Apply revisions (if selected)
+                    // Helper for fuzzy matching (same as used in Revisions below)
+                    const isMatch = (bullet: string, target: string) => {
+                        const normB = normalize(bullet);
+                        return normB === target ||
+                            normB.includes(target) ||
+                            target.includes(normB) ||
+                            (target.length > 10 && normB.startsWith(target.substring(0, 10)));
+                    };
+
+                    // A. Remove Dropped Bullets First (if selected)
+                    if (update.bulletsToDrop && selections?.dropped) {
+                        update.bulletsToDrop.forEach((drop, i) => {
+                            if (selections.dropped.includes(i)) {
+                                const target = normalize(drop.original);
+                                currentBullets = currentBullets.filter(b => !isMatch(b, target));
+                            }
+                        });
+                    }
+
+                    // B. Apply Revisions (if selected)
                     if (update.revisedBullets && selections?.revised) {
                         update.revisedBullets.forEach((revised, i) => {
                             if (selections.revised.includes(i)) {
-                                // Robust Matching Logic
-                                const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,;]$/, '');
                                 const target = normalize(revised.original);
-
                                 let bulletIndex = currentBullets.findIndex(b => normalize(b) === target);
 
                                 // Fallback: Fuzzy search
@@ -202,17 +272,15 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
 
                                 if (bulletIndex !== -1) {
                                     currentBullets[bulletIndex] = revised.new;
-                                } else {
-                                    console.warn(`Could not find original bullet to replace: "${revised.original}"`);
                                 }
                             }
                         });
                     }
 
-                    // Append recommendations (if selected)
-                    if (update.recommendedBullets && selections?.recommended) {
-                        update.recommendedBullets.forEach((rec, i) => {
-                            if (selections.recommended.includes(i)) {
+                    // C. Append Suggestions (if selected) - formerly recommendations
+                    if (update.suggestedAdditions && selections?.suggested) {
+                        update.suggestedAdditions.forEach((rec, i) => {
+                            if (selections.suggested.includes(i)) {
                                 currentBullets.push(rec.bullet);
                             }
                         });
@@ -271,6 +339,15 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
         }
     };
 
+    // Debugging: Check if bulletsToDrop exists
+    console.log('Tailor Data:', tailorResult);
+    if (tailorResult?.improvedExperience) {
+        tailorResult.improvedExperience.forEach((exp, idx) => {
+            console.log(`Exp ${idx} bulletsToDrop:`, exp.bulletsToDrop);
+            console.log(`Exp ${idx} suggestedAdditions:`, exp.suggestedAdditions);
+        });
+    }
+
     // Calculate Preview Text for Live Scoring
     const getPreviewResumeText = () => {
         if (!tailorResult) return '';
@@ -289,8 +366,18 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
             const selections = updates ? selectedImprovements.experience[exp.id] : null;
 
             let description = [...exp.description];
+            const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,;]$/, '');
 
             if (updates && selections) {
+                // Remove Dropped
+                if (updates.bulletsToDrop && selections.dropped) {
+                    updates.bulletsToDrop.forEach((drop, i) => {
+                        if (selections.dropped.includes(i)) {
+                            const target = normalize(drop.original);
+                            description = description.filter(b => normalize(b) !== target);
+                        }
+                    });
+                }
                 // Apply Revisions
                 if (updates.revisedBullets && selections.revised) {
                     updates.revisedBullets.forEach((rev, i) => {
@@ -299,10 +386,10 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                         }
                     });
                 }
-                // Apply Recommendations
-                if (updates.recommendedBullets && selections.recommended) {
-                    updates.recommendedBullets.forEach((rec, i) => {
-                        if (selections.recommended.includes(i)) {
+                // Apply Suggestions
+                if (updates.suggestedAdditions && selections.suggested) {
+                    updates.suggestedAdditions.forEach((rec, i) => {
+                        if (selections.suggested.includes(i)) {
                             description.push(rec.bullet);
                         }
                     });
@@ -468,17 +555,46 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {/* Recommendations */}
-                                                    {exp.recommendedBullets && exp.recommendedBullets.length > 0 && (
-                                                        <div>
-                                                            <h4 className="text-xs font-bold text-green-400 uppercase mb-2">New Bullet Suggestions</h4>
+
+                                                    {/* Pruning Candidates (New) */}
+                                                    {exp.bulletsToDrop && exp.bulletsToDrop.length > 0 && (
+                                                        <div className="mb-3">
+                                                            <h4 className="text-xs font-bold text-red-400 uppercase mb-2 flex items-center justify-between">
+                                                                <span>Candidates for Pruning</span>
+                                                                <span className="text-[10px] font-normal text-gray-500 normal-case">(Check to Remove)</span>
+                                                            </h4>
                                                             <div className="space-y-2">
-                                                                {exp.recommendedBullets.map((rec, recIdx) => (
+                                                                {exp.bulletsToDrop.map((drop, dIdx) => (
+                                                                    <div key={dIdx} className="flex items-start gap-3 text-sm group bg-red-950/20 p-2 rounded border border-red-900/30">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedImprovements.experience[exp.experienceId]?.dropped.includes(dIdx) ?? false}
+                                                                            onChange={() => toggleExperienceSelection(exp.experienceId, 'dropped', dIdx)}
+                                                                            className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 focus:ring-offset-gray-900"
+                                                                        />
+                                                                        <div className="flex-1">
+                                                                            <div className="text-red-300 line-through decoration-red-500/50">{drop.original}</div>
+                                                                            <div className="text-xs text-red-400/80 mt-1 italic">Reason: {drop.reason}</div>
+                                                                            <div className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">
+                                                                                {selectedImprovements.experience[exp.experienceId]?.dropped.includes(dIdx) ? 'Will be Removed' : 'Kept in Resume'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {/* Suggestions */}
+                                                    {exp.suggestedAdditions && exp.suggestedAdditions.length > 0 && (
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-green-400 uppercase mb-2">Gap-Bridging Suggestions</h4>
+                                                            <div className="space-y-2">
+                                                                {exp.suggestedAdditions.map((rec, recIdx) => (
                                                                     <div key={recIdx} className="flex items-start gap-3 text-sm group">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedImprovements.experience[exp.experienceId]?.recommended.includes(recIdx) ?? false}
-                                                                            onChange={() => toggleExperienceSelection(exp.experienceId, 'recommended', recIdx)}
+                                                                            checked={selectedImprovements.experience[exp.experienceId]?.suggested.includes(recIdx) ?? false}
+                                                                            onChange={() => toggleExperienceSelection(exp.experienceId, 'suggested', recIdx)}
                                                                             className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900"
                                                                         />
                                                                         <div className="flex-1">
@@ -504,7 +620,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                     <div className="space-y-2">
                                         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                                             <Lightbulb size={16} className="text-yellow-500" />
-                                            Recommended Projects
+                                            Suggested Projects to bridge gaps
                                         </h3>
                                         <div className="grid gap-3">
                                             {tailorResult.projectSuggestions.map((proj, idx) => (
@@ -550,7 +666,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                     {!tailorResult ? (
                         <button
                             onClick={handleAnalyze}
-                            disabled={isTailoring || !jobDescription.trim()}
+                            disabled={isTailoring || !jobDescription.trim() || (credits !== null && credits < 30)}
                             className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(79,70,229,0.3)]"
                         >
                             {isTailoring ? (
@@ -559,7 +675,7 @@ export const TailorModal = ({ isOpen, onClose, jobDescription: initialJD = '' }:
                                 </>
                             ) : (
                                 <>
-                                    <Wand2 size={18} /> Analyze & Tailor
+                                    <Wand2 size={18} /> Analyze & Tailor (30 ⚡)
                                 </>
                             )}
                         </button>

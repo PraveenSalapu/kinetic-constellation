@@ -4,11 +4,24 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: 'copy-manifest',
+      writeBundle() {
+        import('./scripts/copy-manifest.js').catch(err => {
+          console.error('Failed to run copy-manifest script:', err);
+        });
+      }
+    }
   ],
+  define: {
+    // Inject environment URLs at build time for extension scripts
+    __API_BASE__: JSON.stringify(process.env.VITE_API_URL || 'http://localhost:3001'),
+    __APP_URL__: JSON.stringify(process.env.VITE_APP_URL || 'http://localhost:5173'),
+  },
   resolve: {
     alias: {
       '@careerflow/shared': path.resolve(__dirname, '../../packages/shared/src'),
@@ -38,4 +51,8 @@ export default defineConfig({
       },
     },
   },
-});
+  esbuild: {
+    // Strip console.logs and debugger statements in production
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
+}));

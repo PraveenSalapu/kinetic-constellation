@@ -1,12 +1,54 @@
 import { Plus, Trash2, X, Award } from 'lucide-react';
 import { CollapsibleSection } from '../CollapsibleSection';
 import { useSection } from '../../../hooks/useSection';
+import { useResume } from '../../../context/ResumeContext'; // Import Context
+import { fetchWithAuth } from '../../../services/api';
+import { useToast } from '../../../context/ToastContext';
 import type { Resume } from '../../../types';
 
 type SkillCategory = Resume['skills'][number];
 
 export const Skills = () => {
-    const { items: skills, addItem, deleteItem, updateField } = useSection<SkillCategory>('skills');
+    const { items: _, addItem, deleteItem, updateField } = useSection<SkillCategory>('skills');
+    const { resume, dispatch } = useResume(); // Use Context
+    const { addToast } = useToast();
+    const skills = resume.skills || [];       // Get latest from context
+
+    const handleConsolidate = async () => {
+        // AI-BASED CONSOLIDATION
+        if (!confirm("AI will analyze and reorganize your tech stack into standard categories. This ensures perfect categorization. Continue?")) return;
+
+        addToast('info', 'AI is organizing your skills... 🤖');
+
+        try {
+            const response = await fetchWithAuth('/api/tailor/standardize-skills', {
+                method: 'POST',
+                body: JSON.stringify({ skills: skills })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to standardize skills');
+            }
+
+            const data = await response.json();
+
+            if (data.skills && Array.isArray(data.skills)) {
+                // Update State with AI results
+                dispatch({
+                    type: 'SET_RESUME',
+                    payload: {
+                        ...resume,
+                        skills: data.skills
+                    }
+                });
+                addToast('success', 'Skills reorganized successfully! ✨');
+            }
+
+        } catch (error) {
+            console.error("Skill consolidation failed", error);
+            addToast('error', 'Failed to organize skills. Try again.');
+        }
+    };
 
     const handleAddCategory = () => {
         addItem({
@@ -31,7 +73,14 @@ export const Skills = () => {
             defaultOpen={false}
         >
             <div className="p-4 space-y-4 bg-[#111]">
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                    <button
+                        onClick={handleConsolidate}
+                        className="text-xs text-orange-400 hover:text-orange-300 underline underline-offset-2 hover:bg-orange-950/30 px-2 py-1 rounded"
+                    >
+                        Consolidate & Fix Categories
+                    </button>
+
                     <button
                         onClick={handleAddCategory}
                         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"

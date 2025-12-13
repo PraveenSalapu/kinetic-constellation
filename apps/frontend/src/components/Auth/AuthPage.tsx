@@ -13,6 +13,8 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const [verificationSent, setVerificationSent] = useState(false);
+
   const { login, register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +38,7 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
         await login(email, password);
       } else {
         await register(email, password);
+        setVerificationSent(true);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -43,6 +46,33 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
       setIsLoading(false);
     }
   };
+
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-gray-900 rounded-xl border border-gray-800 p-8 text-center space-y-6">
+          <div className="w-16 h-16 bg-violet-900/30 rounded-full flex items-center justify-center mx-auto border border-violet-500/30">
+            <svg className="w-8 h-8 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
+            <p className="text-gray-400">
+              We've sent a verification link to <span className="text-gray-200 font-medium">{email}</span>.
+              <br />Please verify your email to continue.
+            </p>
+          </div>
+          <button
+            onClick={() => setVerificationSent(false)}
+            className="text-violet-400 hover:text-violet-300 text-sm font-medium hover:underline"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -61,21 +91,19 @@ export function AuthPage({ initialMode = 'login' }: AuthPageProps) {
           <div className="flex mb-6 bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setMode('login')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                mode === 'login'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${mode === 'login'
                   ? 'bg-violet-600 text-white'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Sign In
             </button>
             <button
               onClick={() => setMode('register')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                mode === 'register'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${mode === 'register'
                   ? 'bg-violet-600 text-white'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Sign Up
             </button>

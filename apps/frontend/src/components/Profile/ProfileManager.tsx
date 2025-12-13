@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllProfilesSync, createProfile, deleteProfile, setActiveProfileId } from '../../services/storage';
+import { getAllProfiles, createProfile, deleteProfile, setActiveProfileId } from '../../services/storage';
 import type { UserProfile } from '../../services/storage';
 import { parseResumeWithAI } from '../../services/parser';
 import { useResume } from '../../context/ResumeContext';
@@ -31,32 +31,14 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({ isOpen, onClose,
 
     const loadProfiles = async () => {
         try {
-            // Try loading from API if authenticated via Supabase
-            if (isAuthenticated) {
-                try {
-                    const apiProfiles = await import('../../services/api').then(m => m.getProfiles());
-
-                    const mappedProfiles = (apiProfiles as any[]).map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        data: p.data,
-                        updatedAt: new Date(p.updatedAt).getTime(),
-                        isActive: p.isActive
-                    }));
-
-                    if (mappedProfiles.length > 0) {
-                        setProfiles(mappedProfiles);
-                        return;
-                    }
-                } catch (e) {
-                    console.warn('Failed to load profiles from API, falling back to local:', e);
-                }
-            }
-
-            // Fallback to local storage (only if not auth or API empty/failed)
-            setProfiles(getAllProfilesSync());
+            // Load profiles from API (DB-only storage) - pass userId for scoped caching
+            const user = (await import('../../services/supabase')).supabase.auth.getUser();
+            const userId = (await user).data.user?.id;
+            const profiles = await getAllProfiles(userId);
+            setProfiles(profiles);
         } catch (e) {
             console.error('Error loading profiles:', e);
+            setError('Failed to load profiles');
         }
     };
 

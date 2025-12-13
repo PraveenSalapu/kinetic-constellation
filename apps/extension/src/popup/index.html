@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -201,10 +202,13 @@
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
@@ -218,25 +222,25 @@
 
     <div id="login-view" style="display: none;">
       <form class="login-form" id="login-form">
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" placeholder="you@example.com" required>
+        <!-- Hidden/Legacy Login Form -->
+        <div style="display: none;">
+          <input type="email" id="email" placeholder="you@example.com">
+          <input type="password" id="password" placeholder="••••••••">
+          <button type="submit" id="login-btn">Sign In</button>
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" placeholder="••••••••" required>
+        <div style="text-align: center; margin-bottom: 16px;">
+          <p style="font-size: 14px; color: #d1d5db; margin-bottom: 12px;">To use the extension, please log in on the
+            main website.</p>
+          <a href="http://localhost:5173/auth" target="_blank" class="btn btn-primary"
+            style="display: block; text-decoration: none; text-align: center; padding: 12px;">
+            Login via Web App
+          </a>
         </div>
-
-        <div id="error-container" class="error-message" style="display: none;"></div>
-
-        <button type="submit" class="btn btn-primary" id="login-btn">
-          Sign In
-        </button>
       </form>
 
       <div class="register-link">
-        Don't have an account? <a href="http://localhost:5174/register" target="_blank">Sign up</a>
+        Don't have an account? <a href="http://localhost:5173/join" target="_blank">Sign up</a>
       </div>
     </div>
 
@@ -267,6 +271,11 @@
         Create Default Profile
       </button>
 
+      <button class="btn btn-primary" id="scan-page-btn"
+        style="width: 100%; margin-bottom: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+        🔍 Scan Job Page
+      </button>
+
       <button class="btn btn-secondary" id="logout-btn" style="width: 100%;">
         Sign Out
       </button>
@@ -275,4 +284,5 @@
 
   <script src="./popup.js" type="module"></script>
 </body>
+
 </html>

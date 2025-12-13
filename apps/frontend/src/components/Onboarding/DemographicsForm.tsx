@@ -32,15 +32,16 @@ export const DemographicsForm: React.FC<DemographicsFormProps> = ({
 
     return (
         <form onSubmit={handleSubmit} className={`space-y-6 ${className}`}>
-            {/* Section 1: Identity */}
+            {/* Section 1: Equal Employment (Reference Style) */}
             <div className="space-y-4">
-                <h3 className="text-sm font-mono text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2">Identity Protocols</h3>
+                <h3 className="text-sm font-mono text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2">Equal Employment</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-300">Gender</label>
+                <div className="space-y-4">
+                    {/* Gender */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">What is your gender?</label>
                         <select
-                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
                             value={formData.gender || ''}
                             onChange={(e) => updateField('gender', e.target.value)}
                         >
@@ -52,27 +53,90 @@ export const DemographicsForm: React.FC<DemographicsFormProps> = ({
                         </select>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-300">Race / Ethnicity</label>
+                    {/* Pronouns */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">What are your pronouns?</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. He/Him"
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
+                            value={formData.pronouns || ''}
+                            onChange={(e) => updateField('pronouns', e.target.value)}
+                        />
+                    </div>
+
+                    {/* Hispanic/Latino */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">Are you Hispanic or Latino?</label>
                         <select
-                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
+                            value={formData.isHispanic || ''}
+                            onChange={(e) => updateField('isHispanic', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    {/* Race */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">How would you identify your race?</label>
+                        <select
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
                             value={formData.race || ''}
                             onChange={(e) => updateField('race', e.target.value)}
                         >
                             <option value="">Select...</option>
                             <option value="Asian">Asian</option>
                             <option value="Black or African American">Black or African American</option>
-                            <option value="Hispanic or Latino">Hispanic or Latino</option>
                             <option value="White">White</option>
+                            <option value="Native American">Native American</option>
+                            <option value="Pacific Islander">Pacific Islander</option>
                             <option value="Two or More Races">Two or More Races</option>
                             <option value="Prefer not to say">Prefer not to say</option>
                         </select>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-300">Veteran Status</label>
+                    {/* LGBTQ+ */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">Do you identify as LGBTQ+?</label>
                         <select
-                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
+                            value={formData.isLGBTQ || ''}
+                            onChange={(e) => updateField('isLGBTQ', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    {/* Sexual Orientation */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">Sexual Orientation?</label>
+                        <select
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
+                            value={formData.sexualOrientation || ''}
+                            onChange={(e) => updateField('sexualOrientation', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            <option value="Heterosexual">Heterosexual</option>
+                            <option value="Gay">Gay</option>
+                            <option value="Lesbian">Lesbian</option>
+                            <option value="Bisexual">Bisexual</option>
+                            <option value="Queer">Queer</option>
+                            <option value="Prefer not to say">Prefer not to say</option>
+                        </select>
+                    </div>
+
+                    {/* Veteran */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">Are you a veteran?</label>
+                        <select
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
                             value={formData.veteranStatus || ''}
                             onChange={(e) => updateField('veteranStatus', e.target.value)}
                         >
@@ -83,10 +147,11 @@ export const DemographicsForm: React.FC<DemographicsFormProps> = ({
                         </select>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-300">Disability Status</label>
+                    {/* Disability */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between py-2 border-b border-gray-800/50">
+                        <label className="text-sm font-medium text-gray-300 mb-2 md:mb-0">Do you have a disability?</label>
                         <select
-                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            className="bg-[#111] border border-gray-700 rounded-lg p-2 text-gray-200 focus:border-indigo-500 outline-none w-full md:w-64"
                             value={formData.disabilityStatus || ''}
                             onChange={(e) => updateField('disabilityStatus', e.target.value)}
                         >
@@ -99,7 +164,54 @@ export const DemographicsForm: React.FC<DemographicsFormProps> = ({
                 </div>
             </div>
 
-            {/* Section 2: Authorization */}
+            {/* Section 2: Application Logistics */}
+            <div className="space-y-4 pt-2">
+                <h3 className="text-sm font-mono text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2">Application Logistics</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Availability</label>
+                        <select
+                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            value={formData.availability || ''}
+                            onChange={(e) => updateField('availability', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            <option value="Immediate">Immediate</option>
+                            <option value="2 Weeks Notice">2 Weeks Notice</option>
+                            <option value="1 Month Notice">1 Month Notice</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Salary Expectation</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. $120,000+"
+                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            value={formData.salaryExpectation || ''}
+                            onChange={(e) => updateField('salaryExpectation', e.target.value)}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Willing to Relocate?</label>
+                        <select
+                            className="w-full bg-[#111] border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            value={formData.relocation || ''}
+                            onChange={(e) => updateField('relocation', e.target.value)}
+                        >
+                            <option value="">Select...</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Remote Only">Remote Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* Section 3: Authorization */}
             <div className="space-y-4 pt-2">
                 <h3 className="text-sm font-mono text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2">Authorization Clearance</h3>
 

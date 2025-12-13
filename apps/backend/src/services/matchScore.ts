@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { generateResumeEmbedding, cosineSimilarity, similarityToScore } from './embedding.js';
+import { generateResumeEmbedding, cosineSimilarity, similarityToScore, hasEnoughContentForEmbedding } from './embedding.js';
 import type { Resume } from '@careerflow/shared';
 
 // Lazy-initialized Supabase client
@@ -27,9 +27,16 @@ export interface MatchedJob {
 
 /**
  * Update profile embedding when resume data changes
+ * Only generates embedding if profile has enough content
  */
-export const updateProfileEmbedding = async (profileId: string, resumeData: Resume): Promise<void> => {
+export const updateProfileEmbedding = async (profileId: string, resumeData: Resume): Promise<boolean> => {
   try {
+    // Check if profile has enough content for meaningful embedding
+    if (!hasEnoughContentForEmbedding(resumeData)) {
+      console.log(`Profile ${profileId} doesn't have enough content for embedding yet`);
+      return false;
+    }
+
     const embedding = await generateResumeEmbedding(resumeData);
 
     const { error } = await getSupabase()
@@ -46,6 +53,7 @@ export const updateProfileEmbedding = async (profileId: string, resumeData: Resu
     }
 
     console.log(`Updated embedding for profile ${profileId}`);
+    return true;
   } catch (error) {
     console.error('Error in updateProfileEmbedding:', error);
     throw error;

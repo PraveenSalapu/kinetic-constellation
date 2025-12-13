@@ -12,11 +12,18 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const JSEARCH_API_KEY = process.env.VITE_RAPIDAPI_KEY || 'a813af95c9msh83b8f9b7cd4a46cp156515jsn2b8fedfbe4b9'; // Fallback to hardcoded if env missing for now
+const JSEARCH_API_KEY = process.env.VITE_RAPIDAPI_KEY;
 const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.error('Error: Missing Supabase Credentials in .env');
+// Validate required environment variables
+const missingVars = [];
+if (!SUPABASE_URL) missingVars.push('VITE_SUPABASE_URL');
+if (!SUPABASE_SERVICE_KEY) missingVars.push('SUPABASE_SERVICE_ROLE_KEY');
+if (!JSEARCH_API_KEY) missingVars.push('VITE_RAPIDAPI_KEY');
+
+if (missingVars.length > 0) {
+    console.error(`Error: Missing required environment variables: ${missingVars.join(', ')}`);
+    console.error('Please ensure these are set in your .env file');
     process.exit(1);
 }
 
@@ -49,6 +56,64 @@ const generateJobEmbedding = async (description: string): Promise<number[] | nul
         return result.embeddings[0].values;
     } catch (error) {
         console.error('Error generating embedding:', error);
+        return null;
+    }
+};
+
+// Metadata Interface
+interface JobMetadata {
+    experience_level: string; // "Entry", "Mid", "Senior", "Lead"
+    job_type: string;        // "Full-time", "Contract", "Part-time"
+    category: string;        // "Frontend", "Backend", "Full Stack", "DevOps", "AI/ML", "Mobile"
+}
+
+/**
+ * Analyze job description to extract metadata using Gemini
+ */
+const analyzeJobMetadata = async (description: string, title: string): Promise<JobMetadata | null> => {
+    if (!genAI || !description) return null;
+
+    try {
+        const prompt = `
+        Analyze this job listing and extract the following metadata in strict JSON format:
+        1. experience_level: One of "Entry", "Mid", "Senior", "Lead"
+        2. job_type: One of "Full-time", "Contract", "Part-time", "Internship"
+        3. category: One of "Frontend", "Backend", "Full Stack", "DevOps", "AI/ML", "Mobile", "Data", "Other"
+
+        Job Title: ${title}
+        Description: ${description.slice(0, 1000)}
+
+        Return ONLY the JSON object.
+        `;
+
+        // Use "gemini-2.0-flash-exp" as requested
+        const result = await genAI.models.generateContent({
+            model: "gemini-2.0-flash-exp",
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        });
+
+        // DEBUG: Inspect structure
+        console.log('DEBUG GEMINI RESULT KEYS:', Object.keys(result));
+        try {
+            console.log('DEBUG GEMINI RESULT:', JSON.stringify(result).slice(0, 500));
+        } catch (e) { console.log('Result not stringifiable'); }
+
+        // Attempt safe extraction
+        let jsonString = '';
+        if (result && typeof (result as any).text === 'function') {
+            jsonString = (result as any).text();
+        } else if (result && (result as any).response && typeof (result as any).response.text === 'function') {
+            jsonString = (result as any).response.text();
+        } else {
+            // throw new Error('Unknown response structure'); 
+            return null; // Just skip for now to let loop continue
+        }
+
+        // Simple cleanup to ensure JSON
+        jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(jsonString) as JobMetadata;
+    } catch (error) {
+        console.error('Error analyzing job metadata:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         return null;
     }
 };
@@ -116,6 +181,7 @@ const runCrawler = async () => {
     // 2. Process and Insert into Supabase
     let authorizedCount = 0;
     let embeddingCount = 0;
+    let analyzedCount = 0;
 
     console.log('Processing and inserting jobs...');
 
@@ -127,6 +193,36 @@ const runCrawler = async () => {
 
         const description = job.job_description || 'No description';
 
+        // Analyze metadata (AI) FIRST so it's available for updates
+        const metadata = await analyzeJobMetadata(description, job.job_title);
+        if (metadata) analyzedCount++;
+
+        // Check if job exists first (since no unique constraint on link in DB yet)
+        const { data: existing } = await supabase
+            .from('jobs')
+            .select('id')
+            .eq('link', job.job_apply_link)
+            .maybeSingle();
+
+        if (existing) {
+            console.log(`Updating existing job: ${job.job_title}`);
+            const { error: updateError } = await supabase
+                .from('jobs')
+                .update({
+                    experience_level: metadata?.experience_level || 'Mid',
+                    job_type: metadata?.job_type || 'Full-time',
+                    category: metadata?.category || 'Other'
+                })
+                .eq('id', existing.id);
+
+            if (updateError) {
+                console.error('Update Error:', updateError.message);
+            } else {
+                authorizedCount++;
+            }
+            continue;
+        }
+
         // Generate embedding for this job
         const embedding = await generateJobEmbedding(description);
 
@@ -136,9 +232,10 @@ const runCrawler = async () => {
             link: job.job_apply_link,
             description: description,
             location: 'Remote/US',
-            match_score: 0,
-            missing_skills: [],
-            source: 'jsearch'
+            // Add metadata fields if analysis succeeded, otherwise default or null
+            experience_level: metadata?.experience_level || 'Mid',
+            job_type: metadata?.job_type || 'Full-time',
+            category: metadata?.category || 'Other'
         };
 
         // Add embedding if generated successfully
@@ -149,7 +246,7 @@ const runCrawler = async () => {
 
         const { error } = await supabase
             .from('jobs')
-            .upsert(dbRecord, { onConflict: 'link', ignoreDuplicates: true });
+            .insert(dbRecord);
 
         if (error) {
             console.error('Insert Error:', error.message);
@@ -161,7 +258,7 @@ const runCrawler = async () => {
         await new Promise(resolve => setTimeout(resolve, 200));
     }
 
-    console.log(`Upserted ${authorizedCount} jobs with ${embeddingCount} embeddings.`);
+    console.log(`Upserted ${authorizedCount} jobs with ${embeddingCount} embeddings and ${analyzedCount} classifications.`);
     console.log('Match scores will be calculated on-demand when users view jobs.');
 
     // 3. Cleanup Old Jobs (> 32 hours)

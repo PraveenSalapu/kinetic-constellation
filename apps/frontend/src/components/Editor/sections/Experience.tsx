@@ -3,10 +3,14 @@ import { useState } from 'react';
 import { optimizeBulletPoint } from '../../../services/gemini';
 import { CollapsibleSection } from '../CollapsibleSection';
 import { useBulletSection } from '../../../hooks/useSection';
+import { useAuth } from '../../../context/AuthContext';
+import { useToast } from '../../../context/ToastContext';
 import type { ExperienceItem } from '../../../types';
 
 export const Experience = () => {
     const { items: experience, addItem, deleteItem, updateField, addBullet, removeBullet, updateBullet } = useBulletSection<ExperienceItem>('experience');
+    const { credits, refreshCredits } = useAuth();
+    const { addToast } = useToast();
     const [optimizing, setOptimizing] = useState<{ id: string; index: number } | null>(null);
     const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
 
@@ -34,6 +38,12 @@ export const Experience = () => {
         const bullet = currentBullets[index];
         if (!bullet.trim()) return;
 
+        // Check credits
+        if (credits !== null && credits < 5) {
+            addToast('error', 'Insufficient credits (Cost: 5 ⚡)');
+            return;
+        }
+
         setOptimizing({ id: expId, index });
         const key = `${expId}-${index}`;
         setSuggestions(prev => {
@@ -48,6 +58,8 @@ export const Experience = () => {
                 ...prev,
                 [key]: options
             }));
+            refreshCredits();
+            addToast('success', 'Optimized! (5 credits used)');
         } catch (error) {
             console.error('Optimization failed', error);
         } finally {
@@ -200,7 +212,7 @@ export const Experience = () => {
                                                             onClick={() => handleOptimizeBullet(exp.id, exp.description, idx)}
                                                             disabled={optimizing?.id === exp.id && optimizing?.index === idx}
                                                             className="p-2 text-gray-500 hover:text-indigo-400 hover:bg-indigo-900/20 rounded-lg transition-colors border border-transparent hover:border-indigo-500/30"
-                                                            title="Optimize with AI"
+                                                            title={`Optimize with AI (5 ⚡)`}
                                                         >
                                                             <Sparkles
                                                                 size={16}

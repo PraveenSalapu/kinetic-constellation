@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useResume } from '../../context/ResumeContext';
-import { Cpu, Upload, User, ArrowRight, PlusCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Cpu, Upload, User, ArrowRight, PlusCircle, Loader2 } from 'lucide-react';
 import { extractTextFromPDF } from '../../utils/pdfUtils';
 import { parseResumeWithAI } from '../../services/parser';
-import { getAllProfilesSync, setActiveProfileId, createProfile, type UserProfile } from '../../services/storage';
+import { getAllProfiles, setActiveProfileId, createProfile, updateActiveProfileData, type UserProfile } from '../../services/storage';
 
 interface HeroRoasterProps {
     onScanComplete?: () => void;
@@ -12,25 +13,35 @@ interface HeroRoasterProps {
 
 export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProfileSelect }) => {
     const { dispatch } = useResume();
+    const { user } = useAuth();
     const [isDragging, setIsDragging] = useState(false);
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'complete'>('idle');
     const [logs, setLogs] = useState<string[]>([]);
     const [existingProfiles, setExistingProfiles] = useState<UserProfile[]>([]);
     const [showUpload, setShowUpload] = useState(false);
+    const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
 
     useEffect(() => {
-        const profiles = getAllProfilesSync();
-        const validProfiles = profiles.filter(p =>
-            p.data.personalInfo.fullName.trim() !== '' ||
-            p.data.experience.length > 0 ||
-            (p.name !== 'Default Profile' && p.name.trim() !== '')
-        ).sort((a, b) => b.updatedAt - a.updatedAt);
+        const loadProfiles = async () => {
+            try {
+                const profiles = await getAllProfiles(user?.id);
+                const validProfiles = profiles.filter(p =>
+                    p.data?.personalInfo?.fullName?.trim() !== '' ||
+                    (p.data?.experience && p.data.experience.length > 0) ||
+                    (p.name !== 'Default Profile' && p.name.trim() !== '')
+                ).sort((a, b) => b.updatedAt - a.updatedAt);
 
-        setExistingProfiles(validProfiles);
-        if (validProfiles.length === 0) {
-            setShowUpload(true);
-        }
-    }, []);
+                setExistingProfiles(validProfiles);
+                setShowUpload(validProfiles.length === 0);
+            } catch (error) {
+                console.error('Failed to load profiles:', error);
+                setShowUpload(true);
+            } finally {
+                setIsLoadingProfiles(false);
+            }
+        };
+        loadProfiles();
+    }, [user?.id]);
 
     const addLog = (msg: string) => setLogs(prev => [...prev, `> ${msg}`]);
 
@@ -52,11 +63,44 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProf
             addLog("Analyzing keyword density against current market...");
 
             const parsedData = await parseResumeWithAI(text);
+            let finalResumeData = parsedData;
+
+            // Save to database immediately (before view transition)
+            addLog("Saving profile to database...");
+            try {
+                // Check if we have an active profile to update, or need to create one
+                const activeProfile = existingProfiles.find(p => p.isActive);
+
+                if (activeProfile) {
+                    // Update existing
+                    // Ensure we preserve the ID
+                    finalResumeData = { ...parsedData, id: activeProfile.id };
+                    await updateActiveProfileData(finalResumeData, user?.id);
+                    addLog("Profile updated successfully.");
+                } else {
+                    // Create new profile for this upload
+                    const newProfile = await createProfile(
+                        parsedData.personalInfo.fullName || 'Uploaded Resume',
+                        parsedData,
+                        user?.id
+                    );
+                    await setActiveProfileId(newProfile.id, user?.id);
+                    // Critical: Use the new ID from DB
+                    finalResumeData = newProfile.data;
+                    addLog("New profile created successfully.");
+                }
+            } catch (saveError) {
+                console.error('Failed to save parsed resume:', saveError);
+                addLog("Warning: Could not save to database.");
+            }
 
             setTimeout(() => {
                 addLog("Optimization complete.");
                 setScanState('complete');
-                dispatch({ type: 'SET_RESUME', payload: parsedData });
+
+                // Dispatch with the CORRECT ID (from DB or existing)
+                dispatch({ type: 'SET_RESUME', payload: finalResumeData });
+
                 dispatch({
                     type: 'SET_SCAN_RESULTS',
                     payload: {
@@ -92,17 +136,29 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProf
         }
     };
 
+    const [activatingProfileId, setActivatingProfileId] = useState<string | null>(null);
+
     const handleContinueProfile = async (profileId: string) => {
-        const profile = await setActiveProfileId(profileId);
-        if (profile) {
-            dispatch({ type: 'SET_RESUME', payload: profile.data });
-            if (onProfileSelect) onProfileSelect();
+        setActivatingProfileId(profileId);
+        try {
+            const activeProfile = await setActiveProfileId(profileId, user?.id);
+            if (activeProfile && activeProfile.data) {
+                // Use the returned profile payload (might have new ID if healed)
+                dispatch({ type: 'SET_RESUME', payload: activeProfile.data });
+                if (onProfileSelect) onProfileSelect();
+            } else {
+                console.error("Could not activate profile", profileId);
+                setActivatingProfileId(null);
+            }
+        } catch (error) {
+            console.error("Failed to continue profile:", error);
+            setActivatingProfileId(null);
         }
     };
 
     const handleStartScratch = async () => {
-        const newProfile = await createProfile('New Resume');
-        await setActiveProfileId(newProfile.id);
+        const newProfile = await createProfile('New Resume', undefined, user?.id);
+        await setActiveProfileId(newProfile.id, user?.id);
         dispatch({ type: 'SET_RESUME', payload: newProfile.data });
         if (onProfileSelect) onProfileSelect(); // Skip scan results for scratch
     };
@@ -136,11 +192,12 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProf
                         <button
                             key={profile.id}
                             onClick={() => handleContinueProfile(profile.id)}
-                            className="w-full flex items-center justify-between p-4 bg-[#1A1A1A] border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-[#222] transition-all group text-left"
+                            disabled={activatingProfileId !== null}
+                            className={`w-full flex items-center justify-between p-4 bg-[#1A1A1A] border border-gray-800 rounded-xl hover:border-indigo-500/50 hover:bg-[#222] transition-all group text-left ${activatingProfileId === profile.id ? 'border-indigo-500 bg-[#222]' : ''}`}
                         >
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-indigo-900/20 rounded-lg text-indigo-400 group-hover:scale-110 transition-transform">
-                                    <User size={20} />
+                                    {activatingProfileId === profile.id ? <Loader2 size={20} className="animate-spin" /> : <User size={20} />}
                                 </div>
                                 <div>
                                     <h4 className="font-medium text-gray-200 group-hover:text-white">{profile.data.personalInfo.fullName || profile.name}</h4>
@@ -253,6 +310,16 @@ export const HeroRoaster: React.FC<HeroRoasterProps> = ({ onScanComplete, onProf
             </div>
         </>
     );
+
+    // Loading state while fetching profiles
+    if (isLoadingProfiles) {
+        return (
+            <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#0F0F0F] text-white">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
+                <p className="text-gray-400 font-mono text-sm">Loading profiles...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#0F0F0F] text-white p-6 overflow-hidden">

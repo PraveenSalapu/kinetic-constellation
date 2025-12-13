@@ -33,6 +33,7 @@ const updateProfileSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   data: z.object({}).passthrough().optional(),
   isActive: z.boolean().optional(),
+  hasCompletedOnboarding: z.boolean().optional(),
 });
 
 // GET /api/profiles - Get all profiles for current user
@@ -60,6 +61,7 @@ router.get('/', async (req: Request, res: Response) => {
         name: p.name,
         data: p.data,
         isActive: p.is_active,
+        hasCompletedOnboarding: p.has_completed_onboarding ?? false,
         createdAt: p.created_at,
         updatedAt: p.updated_at,
       })),
@@ -96,6 +98,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         name: profile.name,
         data: profile.data,
         isActive: profile.is_active,
+        hasCompletedOnboarding: profile.has_completed_onboarding ?? false,
         createdAt: profile.created_at,
         updatedAt: profile.updated_at,
       },
@@ -165,6 +168,7 @@ router.post('/', async (req: Request, res: Response) => {
         name,
         data,
         isActive: isFirstProfile,
+        hasCompletedOnboarding: false,
         createdAt: now,
         updatedAt: now,
       },
@@ -222,6 +226,9 @@ router.put('/:id', async (req: Request, res: Response) => {
           .neq('id', id);
       }
     }
+    if (validation.data.hasCompletedOnboarding !== undefined) {
+      updates.has_completed_onboarding = validation.data.hasCompletedOnboarding;
+    }
 
     const { data: updated, error } = await getSupabase()
       .from('profiles')
@@ -251,6 +258,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         name: updated.name,
         data: updated.data,
         isActive: updated.is_active,
+        hasCompletedOnboarding: updated.has_completed_onboarding ?? false,
         createdAt: updated.created_at,
         updatedAt: updated.updated_at,
       },

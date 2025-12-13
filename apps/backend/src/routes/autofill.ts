@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authenticateToken } from '../middleware/auth.js';
+import { generateResumePDF } from '../services/pdf.js';
 
 const router: Router = Router();
 
@@ -29,6 +30,7 @@ const createPendingAutofillSchema = z.object({
   company: z.string().optional(),
   jobDescription: z.string().optional(),
   tailoredResume: z.object({}).passthrough(), // Resume data
+  coverLetter: z.string().optional(), // Generated cover letter text
 });
 
 const saveJobSchema = z.object({
@@ -50,7 +52,7 @@ router.post('/pending', async (req: Request, res: Response) => {
       return;
     }
 
-    const { profileId, jobUrl, jobTitle, company, jobDescription, tailoredResume } = validation.data;
+    const { profileId, jobUrl, jobTitle, company, jobDescription, tailoredResume, coverLetter } = validation.data;
 
     // Verify profile ownership
     const { data: profile } = await getSupabase()
@@ -83,6 +85,7 @@ router.post('/pending', async (req: Request, res: Response) => {
       company: company,
       job_description: jobDescription,
       tailored_resume: tailoredResume,
+      cover_letter: coverLetter || null,
       status: 'pending',
     });
 
@@ -138,6 +141,7 @@ router.get('/pending', async (req: Request, res: Response) => {
         jobTitle: autofill.job_title,
         company: autofill.company,
         tailoredResume: autofill.tailored_resume,
+        coverLetter: autofill.cover_letter || null,
       },
     });
   } catch (error) {
@@ -342,6 +346,54 @@ router.delete('/jobs/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Delete job error:', error);
     res.status(500).json({ error: 'Failed to delete job' });
+  }
+});
+
+// GET /api/autofill/pending/:id/pdf - Generate PDF from tailored resume in pending autofill
+router.get('/pending/:id/pdf', async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+    const { id } = req.params;
+
+    // Get the pending autofill record
+    const { data: autofill, error } = await getSupabase()
+      .from('pending_autofills')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !autofill) {
+      res.status(404).json({ error: 'Autofill record not found' });
+      return;
+    }
+
+    const tailoredResume = autofill.tailored_resume;
+    if (!tailoredResume) {
+      res.status(400).json({ error: 'No resume data found in autofill record' });
+      return;
+    }
+
+    // Generate PDF from the tailored resume data
+    const pdfBuffer = await generateResumePDF(tailoredResume);
+
+    // Generate filename
+    const fullName = tailoredResume?.personalInfo?.fullName || 'Resume';
+    const company = autofill.company || '';
+    const safeName = fullName.replace(/[^a-zA-Z0-9]/g, '_');
+    const safeCompany = company.replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = safeCompany
+      ? `${safeName}_${safeCompany}_Tailored.pdf`
+      : `${safeName}_Tailored.pdf`;
+
+    // Send PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Generate tailored PDF error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 

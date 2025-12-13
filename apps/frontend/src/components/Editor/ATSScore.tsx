@@ -31,16 +31,10 @@ export const ATSScore = () => {
         setError(null);
 
         try {
-            // Remove ID and other non-content fields
-            const resumeContent = JSON.stringify(resume, (key, value) => {
-                if (key === 'id' || key === 'isVisible' || key === 'order') return undefined;
-                return value;
-            }, 2);
-
             // Run both analyses in parallel
             const [scoreResult, tailorResult] = await Promise.all([
                 calculateATSScore(resume, jobDescription),
-                tailorResume(resumeContent, jobDescription)
+                tailorResume(resume, jobDescription) // Pass object for TOON encoding
             ]);
 
             // Validate we got valid responses
@@ -57,7 +51,7 @@ export const ATSScore = () => {
             const initialRecs = new Set<string>();
             if (tailorResult.improvedExperience) {
                 tailorResult.improvedExperience.forEach(exp => {
-                    exp.recommendedBullets.forEach((_, idx) => {
+                    exp.suggestedAdditions?.forEach((_: unknown, idx: number) => {
                         initialRecs.add(`${exp.experienceId}-rec-${idx}`);
                     });
                 });
@@ -128,7 +122,7 @@ export const ATSScore = () => {
 
             // Update experience bullet points
             if (improvedExperience && improvedExperience.length > 0) {
-                improvedExperience.forEach(({ experienceId, revisedBullets, recommendedBullets }) => {
+                improvedExperience.forEach(({ experienceId, revisedBullets, suggestedAdditions }) => {
                     const existingExperience = resume.experience.find(e => e.id === experienceId);
                     if (!existingExperience) return;
 
@@ -153,7 +147,7 @@ export const ATSScore = () => {
                     });
 
                     // Add recommendations (only selected ones)
-                    recommendedBullets.forEach((rec, idx) => {
+                    suggestedAdditions?.forEach((rec: { bullet: string; reason: string }, idx: number) => {
                         if (selectedRecommendations.has(`${experienceId}-rec-${idx}`)) {
                             newBullets.push(rec.bullet);
                         }
@@ -434,11 +428,11 @@ export const ATSScore = () => {
                                                     )}
 
                                                     {/* Recommended Bullets */}
-                                                    {exp.recommendedBullets.length > 0 && (
+                                                    {(exp.suggestedAdditions?.length ?? 0) > 0 && (
                                                         <div className="space-y-3">
                                                             <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Recommended Additions</p>
                                                             <div className="space-y-2">
-                                                                {exp.recommendedBullets.map((rec, recIdx) => {
+                                                                {exp.suggestedAdditions?.map((rec: { bullet: string; reason: string }, recIdx: number) => {
                                                                     const recId = `${exp.experienceId}-rec-${recIdx}`;
                                                                     const isSelected = selectedRecommendations.has(recId);
                                                                     return (

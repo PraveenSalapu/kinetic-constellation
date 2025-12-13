@@ -13,6 +13,7 @@ const userAvatar = document.getElementById('user-avatar')!;
 const userEmail = document.getElementById('user-email')!;
 const logoutBtn = document.getElementById('logout-btn')!;
 const createProfileBtn = document.getElementById('create-profile-btn')!;
+const scanPageBtn = document.getElementById('scan-page-btn')!;
 
 // Check auth status on load
 async function checkAuth(): Promise<void> {
@@ -109,7 +110,7 @@ createProfileBtn?.addEventListener('click', async () => {
   createProfileBtn.setAttribute('disabled', 'true');
 
   try {
-    const response = await chrome.runtime.sendMessage({ 
+    const response = await chrome.runtime.sendMessage({
       type: 'CREATE_PROFILE',
       name: 'Default Profile',
       data: {
@@ -137,6 +138,44 @@ createProfileBtn?.addEventListener('click', async () => {
     alert('Network error');
     createProfileBtn.textContent = 'Create Default Profile';
     createProfileBtn.removeAttribute('disabled');
+  }
+});
+
+// Scan Job Page Button
+scanPageBtn?.addEventListener('click', async () => {
+  scanPageBtn.textContent = 'Scanning...';
+  scanPageBtn.setAttribute('disabled', 'true');
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'SCAN_PAGE' }, (response) => {
+        if (chrome.runtime.lastError) {
+          showError('Please refresh the page and try again.');
+          scanPageBtn.textContent = '🔍 Scan Job Page';
+          scanPageBtn.removeAttribute('disabled');
+          return;
+        }
+
+        if (response?.success) {
+          scanPageBtn.textContent = '✅ Found!';
+          setTimeout(() => {
+            window.close(); // Close popup so user sees the widget
+          }, 500);
+        } else {
+          showError('No job detected on this page.');
+          scanPageBtn.textContent = '🔍 Scan Job Page';
+          scanPageBtn.removeAttribute('disabled');
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Scan error:', error);
+    scanPageBtn.textContent = 'Error';
+    setTimeout(() => {
+      scanPageBtn.textContent = '🔍 Scan Job Page';
+      scanPageBtn.removeAttribute('disabled');
+    }, 2000);
   }
 });
 

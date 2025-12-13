@@ -1,7 +1,9 @@
 // Background Service Worker
 // Handles API communication, token management, and message routing
 
-const API_BASE = 'http://localhost:3001'; // Change in production
+// API URL - injected at build time via Vite's define or falls back to localhost
+declare const __API_BASE__: string | undefined;
+const API_BASE = typeof __API_BASE__ !== 'undefined' ? __API_BASE__ : 'http://localhost:3001';
 
 interface StoredAuth {
   accessToken: string;
@@ -47,45 +49,29 @@ function isTokenExpired(expiresAt: number): boolean {
   return Date.now() >= (expiresAt - 60000);
 }
 
-// Refresh the access token
-async function refreshAccessToken(refreshToken: string): Promise<StoredAuth | null> {
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!response.ok) {
-      console.error('[CareerFlow] Token refresh failed:', response.status);
-      return null;
-    }
-
-    const data = await response.json();
-
-    const newAuth: StoredAuth = {
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: Date.now() + 15 * 60 * 1000, // 15 minutes
-      user: data.user,
-    };
-
-    await storeAuth(newAuth);
-    return newAuth;
-  } catch (error) {
-    console.error('[CareerFlow] Token refresh error:', error);
-    return null;
-  }
-}
-
-// Get valid access token (refresh if needed)
+// Get valid access token
+// Note: Token refresh is handled by Supabase on the web app side.
+// The extension syncs the session from the web app, which includes an already-valid token.
+// If the token is expired, user needs to re-visit the web app to get a fresh session.
 async function getValidToken(): Promise<string | null> {
   const auth = await getStoredAuth();
-  if (!auth) return null;
+  if (!auth) {
+    console.log('[CareerFlow] No auth stored');
+    return null;
+  }
 
-  if (isTokenExpired(auth.expiresAt)) {
-    const newAuth = await refreshAccessToken(auth.refreshToken);
-    return newAuth?.accessToken || null;
+  // For Supabase tokens synced from web app, we trust the token as long as it exists
+  // The web app handles refresh automatically, and we sync on each visit
+  // Only clear if significantly expired (more than 1 hour past expiry)
+  if (auth.expiresAt && isTokenExpired(auth.expiresAt)) {
+    const hoursPastExpiry = (Date.now() - auth.expiresAt) / (1000 * 60 * 60);
+    if (hoursPastExpiry > 1) {
+      console.log('[CareerFlow] Token expired over 1 hour ago, clearing auth');
+      await clearAuth();
+      return null;
+    }
+    // Token might still work, Supabase tokens have some grace period
+    console.log('[CareerFlow] Token may be expired, but trying anyway');
   }
 
   return auth.accessToken;
@@ -108,24 +94,11 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promi
     },
   });
 
-  // If unauthorized, try to refresh and retry once
+  // If unauthorized, clear auth and throw - user needs to re-sync from web app
   if (response.status === 401) {
-    const auth = await getStoredAuth();
-    if (auth?.refreshToken) {
-      const newAuth = await refreshAccessToken(auth.refreshToken);
-      if (newAuth) {
-        return fetch(`${API_BASE}${endpoint}`, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${newAuth.accessToken}`,
-            ...options.headers,
-          },
-        });
-      }
-    }
+    console.log('[CareerFlow] Got 401, clearing auth. User needs to re-login via web app.');
     await clearAuth();
-    throw new Error('Session expired');
+    throw new Error('Session expired. Please log in again via the CareerFlow web app.');
   }
 
   return response;
@@ -266,6 +239,46 @@ async function handleGetResumePDF(profileId: string): Promise<{ pdf?: string; fi
   }
 }
 
+// Fetch tailored resume PDF as base64 (from pending autofill record)
+async function handleGetTailoredPDF(autofillId: string): Promise<{ pdf?: string; filename?: string; error?: string }> {
+  try {
+    const token = await getValidToken();
+    if (!token) {
+      return { error: 'Not authenticated' };
+    }
+
+    const response = await fetch(`${API_BASE}/api/autofill/pending/${autofillId}/pdf`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { error: errorData.error || 'Failed to generate tailored PDF' };
+    }
+
+    // Get filename from Content-Disposition header
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'Tailored_Resume.pdf';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+)"/);
+      if (match) filename = match[1];
+    }
+
+    // Convert to base64
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    );
+
+    return { pdf: base64, filename };
+  } catch (error) {
+    console.error('[CareerFlow] Tailored PDF fetch error:', error);
+    return { error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
 // Check for pending autofill for a URL
 async function handleCheckPendingAutofill(url: string): Promise<{ found: boolean; autofill?: unknown; error?: string }> {
   try {
@@ -389,12 +402,74 @@ async function handleExtractJobAI(
   }
 }
 
+// Generate AI essay responses for job application questions
+interface EssayQuestion {
+  id: string;
+  question: string;
+  fieldSelector: string;
+  maxLength?: number;
+  required?: boolean;
+}
+
+interface EssayResponse {
+  questionId: string;
+  response: string;
+  wordCount: number;
+  category: string;
+  confidence: number;
+}
+
+async function handleGenerateEssays(
+  profileId: string,
+  jobDescription: string,
+  jobTitle: string,
+  company: string,
+  questions: EssayQuestion[]
+): Promise<{ responses?: EssayResponse[]; error?: string }> {
+  try {
+    const response = await fetchWithAuth('/api/tailor/essays', {
+      method: 'POST',
+      body: JSON.stringify({
+        profileId,
+        jobDescription,
+        jobTitle,
+        company,
+        questions,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return { error: result.error || 'Failed to generate essay responses' };
+    }
+
+    return { responses: result.responses };
+  } catch (error) {
+    console.error('[CareerFlow] Essay generation error:', error);
+    return { error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
 // Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const handleMessage = async () => {
     switch (message.type) {
       case 'LOGIN':
         return handleLogin(message.email, message.password);
+
+      case 'SYNC_SESSION':
+        if (message.session && message.session.access_token) {
+          const auth: StoredAuth = {
+            accessToken: message.session.access_token,
+            refreshToken: message.session.refresh_token,
+            expiresAt: (message.session.expires_at || (Date.now() / 1000) + 3600) * 1000,
+            user: message.session.user,
+          };
+          await storeAuth(auth);
+          return { success: true };
+        }
+        return { success: false, error: 'Invalid session data' };
 
       case 'LOGOUT':
         return handleLogout();
@@ -417,6 +492,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case 'GET_RESUME_PDF':
         return handleGetResumePDF(message.profileId);
 
+      case 'GET_TAILORED_PDF':
+        return handleGetTailoredPDF(message.autofillId);
+
       case 'CHECK_PENDING_AUTOFILL':
         return handleCheckPendingAutofill(message.url);
 
@@ -428,6 +506,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
       case 'EXTRACT_JOB_AI':
         return handleExtractJobAI(message.url, message.partialData);
+
+      case 'GENERATE_ESSAYS':
+        return handleGenerateEssays(
+          message.profileId,
+          message.jobDescription,
+          message.jobTitle,
+          message.company,
+          message.questions
+        );
 
       default:
         return { error: 'Unknown message type' };

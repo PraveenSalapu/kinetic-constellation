@@ -1,86 +1,149 @@
--- CareerFlow Database Schema (Supabase Native Auth)
--- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/vfgksoguvlrdplbyintl/sql
+-- DESTRUCTIVE RESET & INIT
+-- This script acts as a "Hard Reset". It DROPS existing tables to ensure the new schema
+-- (with all required columns like 'embedding' and 'credits') is correctly applied.
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- 1. CLEANUP (Drop existing to allow full recreation)
+DROP TABLE IF EXISTS profile_job_matches CASCADE;
+DROP TABLE IF EXISTS pending_autofills CASCADE;
+DROP TABLE IF EXISTS saved_jobs CASCADE;
+DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS user_usage CASCADE;
+DROP TABLE IF EXISTS jobs CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
 
--- Profiles table (stores resume data)
-CREATE TABLE IF NOT EXISTS profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- References Supabase Auth
-  name VARCHAR(255) NOT NULL,
-  data JSONB NOT NULL,
-  is_active BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Enable necessary extensions
+create extension if not exists vector;
+create extension if not exists "uuid-ossp";
+
+-- 2. PROFILES (User Resumes & Settings)
+create table profiles (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  name text not null,
+  data jsonb not null default '{}'::jsonb,
+  is_active boolean default false,
+  has_completed_onboarding boolean default false,
+  embedding vector(768), -- Dimensions for Google Gemini Embedding text-embedding-004
+  embedding_updated_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
--- Pending autofills table (jobs ready for extension to auto-fill)
-CREATE TABLE IF NOT EXISTS pending_autofills (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  job_url VARCHAR(2000) NOT NULL,
-  job_title VARCHAR(500),
-  company VARCHAR(500),
-  job_description TEXT,
-  tailored_resume JSONB, 
-  status VARCHAR(50) DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '24 hours'
+-- Index for checking active profile quickly
+create index idx_profiles_user_active on profiles(user_id) where is_active = true;
+
+-- 3. JOBS (Global Job Listings - Scraped or Added)
+create table jobs (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  company text not null,
+  link text not null,
+  description text,
+  location text,
+  platform text,
+  embedding vector(768),
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
--- Saved jobs table (jobs scraped from extension for tailoring)
-CREATE TABLE IF NOT EXISTS saved_jobs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  job_url VARCHAR(2000) NOT NULL,
-  job_title VARCHAR(500),
-  company VARCHAR(500),
-  job_description TEXT,
-  platform VARCHAR(100), 
-  status VARCHAR(50) DEFAULT 'saved',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 4. APPLICATIONS (User's Job Tracker)
+create table applications (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  company text not null,
+  job_title text not null,
+  job_url text,
+  location text,
+  status text default 'saved', -- saved, applied, screening, etc.
+  applied_date timestamp with time zone,
+  source text,
+  notes text,
+  salary_text text,
+  resume_version uuid references profiles(id) on delete set null,
+  timeline jsonb default '[]'::jsonb,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
--- Applications table (Cloud Application Tracker)
-CREATE TABLE IF NOT EXISTS applications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  company VARCHAR(255) NOT NULL,
-  job_title VARCHAR(255) NOT NULL,
-  job_url VARCHAR(2000),
-  location VARCHAR(255),
-  status VARCHAR(50) DEFAULT 'saved',
-  applied_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  source VARCHAR(100),
-  notes TEXT,
-  salary_text VARCHAR(255),
-  resume_version UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  timeline JSONB DEFAULT '[]'::jsonb,
-  contacts JSONB DEFAULT '[]'::jsonb,
-  interview_notes JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 5. SAVED_JOBS (Extension 'Save for Later' / Staging area)
+create table saved_jobs (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  job_url text,
+  job_title text,
+  company text,
+  job_description text,
+  platform text,
+  status text default 'saved',
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
 );
 
--- Create indexes
-CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_pending_autofills_user_id ON pending_autofills(user_id);
-CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id ON saved_jobs(user_id);
-CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
+-- 6. PENDING_AUTOFILLS (Bridge between Web App Tailoring & Extension Autofill)
+create table pending_autofills (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  profile_id uuid references profiles(id) on delete cascade,
+  job_url text not null,
+  job_title text,
+  company text,
+  job_description text,
+  tailored_resume jsonb not null,
+  status text default 'pending', -- pending, completed
+  expires_at timestamp with time zone default (now() + interval '24 hours'),
+  created_at timestamp with time zone default now()
+);
 
--- Enable RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pending_autofills ENABLE ROW LEVEL SECURITY;
-ALTER TABLE saved_jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+-- 7. USER_USAGE (Credits & Rate Limiting)
+create table user_usage (
+  user_id uuid primary key references auth.users(id) on delete cascade, -- One record per user
+  credits int default 500,
+  last_refill_at timestamp with time zone default now()
+);
 
--- Add Policies (Allows Service Role / Backend to access all)
--- Note: For frontend access via Supabase Client, you would need "auth.uid() = user_id" policies.
--- Since we are proxying through our backend API for most things, these are essential for the Service Role.
-CREATE POLICY "Service role full access on profiles" ON profiles FOR ALL USING (true);
-CREATE POLICY "Service role full access on pending_autofills" ON pending_autofills FOR ALL USING (true);
-CREATE POLICY "Service role full access on saved_jobs" ON saved_jobs FOR ALL USING (true);
-CREATE POLICY "Service role full access on applications" ON applications FOR ALL USING (true);
+-- 8. PROFILE_JOB_MATCHES (Pre-computed Scores Cache)
+create table profile_job_matches (
+  id uuid primary key default uuid_generate_v4(),
+  profile_id uuid references profiles(id) on delete cascade,
+  job_id uuid references jobs(id) on delete cascade,
+  match_score float,
+  created_at timestamp with time zone default now(),
+  unique(profile_id, job_id)
+);
+
+-- RLS POLICIES (Security)
+-- Enable RLS on all tables
+alter table profiles enable row level security;
+alter table applications enable row level security;
+alter table saved_jobs enable row level security;
+alter table pending_autofills enable row level security;
+alter table user_usage enable row level security;
+alter table jobs enable row level security;
+alter table profile_job_matches enable row level security;
+
+-- PROFILES Policy
+create policy "Users can view own profiles" on profiles for select using (auth.uid() = user_id);
+create policy "Users can insert own profiles" on profiles for insert with check (auth.uid() = user_id);
+create policy "Users can update own profiles" on profiles for update using (auth.uid() = user_id);
+create policy "Users can delete own profiles" on profiles for delete using (auth.uid() = user_id);
+
+-- APPLICATIONS Policy
+create policy "Users can all own applications" on applications for all using (auth.uid() = user_id);
+
+-- SAVED_JOBS Policy
+create policy "Users can all own saved_jobs" on saved_jobs for all using (auth.uid() = user_id);
+
+-- PENDING_AUTOFILLS Policy
+create policy "Users can all own pending_autofills" on pending_autofills for all using (auth.uid() = user_id);
+
+-- USER_USAGE Policy
+create policy "Users can view own usage" on user_usage for select using (auth.uid() = user_id);
+create policy "Users can update own usage" on user_usage for update using (auth.uid() = user_id);
+
+-- JOBS Policy (Public Read)
+create policy "Public can view jobs" on jobs for select using (true);
+
+-- MATCHES Policy
+create policy "Users can view own matches" on profile_job_matches for select using (
+  exists (select 1 from profiles where profiles.id = profile_job_matches.profile_id and profiles.user_id = auth.uid())
+);

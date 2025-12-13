@@ -9,40 +9,88 @@ export interface UserProfile {
     data: Resume;
     updatedAt: number;
     isActive: boolean;
+    hasCompletedOnboarding?: boolean;
 }
 
-const STORAGE_KEY_PROFILES = 'kinetic_profiles_v1';
-const MAX_PROFILES = 4;
+// ============ CACHE LAYER ============
+// localStorage is used as a cache for faster loads, not as primary storage
+// DB (via API) is always the source of truth
+// Cache is cleared on logout to prevent data leaks between users
 
-// Check if user is authenticated
-import { supabase } from './supabase';
+const CACHE_PREFIX = 'careerflow_profile_cache_';
+const CACHE_TIMESTAMP_KEY = 'careerflow_cache_timestamp'; // Legacy: Global timestamp
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache validity
 
-// Check if user is authenticated
-const isAuthenticated = async (): Promise<boolean> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return !!session;
+interface ProfileCache {
+    profiles: UserProfile[];
+    activeProfileId: string | null;
+    timestamp: number;
+}
+
+// Helper to get cache key for specific user
+const getCacheKey = (userId?: string) => {
+    if (!userId) return 'careerflow_guest_cache';
+    return `${CACHE_PREFIX}${userId}`;
 };
 
-// ============ LOCAL STORAGE OPERATIONS (fallback when not authenticated) ============
-
-const getLocalProfiles = (): UserProfile[] => {
+// Get cached profiles (returns null if cache miss or expired)
+const getCachedProfiles = (userId?: string): ProfileCache | null => {
     try {
-        const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-        if (!stored) {
-            return [];
+        const key = getCacheKey(userId);
+        const cached = localStorage.getItem(key);
+        if (!cached) return null;
+
+        const data = JSON.parse(cached) as ProfileCache;
+        if (!data.timestamp) return null; // Invalid format
+
+        const cacheAge = Date.now() - data.timestamp;
+        if (cacheAge > CACHE_TTL) {
+            console.log(`[Cache] Cache expired for ${userId || 'guest'}, will fetch from API`);
+            return null;
         }
-        return JSON.parse(stored);
-    } catch (error) {
-        console.error('Failed to load local profiles:', error);
-        return [];
+
+        return data;
+    } catch (e) {
+        console.warn('[Cache] Failed to read cache:', e);
+        return null;
     }
 };
 
-const saveLocalProfiles = (profiles: UserProfile[]): void => {
-    localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+// Update cache with fresh data
+const updateCache = (profiles: UserProfile[], userId?: string): void => {
+    try {
+        const activeProfile = profiles.find(p => p.isActive);
+        const cache: ProfileCache = {
+            profiles,
+            activeProfileId: activeProfile?.id || null,
+            timestamp: Date.now()
+        };
+        const key = getCacheKey(userId);
+        localStorage.setItem(key, JSON.stringify(cache));
+        console.log(`[Cache] Updated cache for ${userId || 'guest'} with`, profiles.length, 'profiles');
+    } catch (e) {
+        console.warn('[Cache] Failed to update cache:', e);
+    }
 };
 
-// ============ API OPERATIONS (when authenticated) ============
+// Invalidate cache (force next read to fetch from API)
+export const invalidateCache = (userId?: string): void => {
+    const key = getCacheKey(userId);
+    localStorage.removeItem(key);
+    console.log(`[Cache] Cache invalidated for ${userId || 'guest'}`);
+};
+
+// Clear all cached data (call on logout)
+export const clearCache = (): void => {
+    // Clear all keys starting with prefix
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(CACHE_PREFIX) || key === 'careerflow_guest_cache') {
+            localStorage.removeItem(key);
+        }
+    });
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+    console.log('[Cache] All caches cleared');
+};
 
 // Convert API profile to UserProfile format
 const apiToUserProfile = (apiProfile: any): UserProfile => ({
@@ -51,262 +99,360 @@ const apiToUserProfile = (apiProfile: any): UserProfile => ({
     data: apiProfile.data,
     updatedAt: apiProfile.updatedAt ? new Date(apiProfile.updatedAt).getTime() : Date.now(),
     isActive: apiProfile.isActive || false,
+    hasCompletedOnboarding: apiProfile.hasCompletedOnboarding ?? false,
 });
 
-// ============ UNIFIED PROFILE OPERATIONS ============
+// ============ PROFILE OPERATIONS (DB + Cache) ============
 
-export const getAllProfiles = async (): Promise<UserProfile[]> => {
-    if (await isAuthenticated()) {
+export const getAllProfiles = async (userId?: string): Promise<UserProfile[]> => {
+    // Try cache first for instant load
+    const cached = getCachedProfiles(userId);
+    if (cached) {
+        console.log(`[Storage] Returning cached profiles for ${userId || 'guest'}`);
+
+        // Only refresh background if we have a userId (Auth mode)
+        if (userId) {
+            api.getProfiles().then(apiProfiles => {
+                const profiles = (apiProfiles as any[]).map(apiToUserProfile);
+                updateCache(profiles, userId);
+            }).catch(e => console.warn('[Cache] Background refresh failed:', e));
+        }
+
+        return cached.profiles;
+    }
+
+    // Cache miss - fetch from API (Only if authenticated/userId provided)
+    // If guest (no userId), return empty array or local only? 
+    // Guest mode logic is handled by frontend Context usually, but here we assume API fetch if not found.
+    // Wait: Guest mode shouldn't call API.
+
+    if (userId) {
         try {
+            console.log('[Storage] Cache miss, fetching from API');
             const apiProfiles = await api.getProfiles();
             const profiles = (apiProfiles as any[]).map(apiToUserProfile);
-            // Update local cache
-            saveLocalProfiles(profiles);
+            updateCache(profiles, userId);
             return profiles;
         } catch (error) {
-            console.warn('Failed to fetch profiles from API, falling back to local:', error);
-            // Fallback to local
-            return getLocalProfiles();
+            console.error('Failed to fetch profiles from API:', error);
+            throw error;
         }
+    } else {
+        // Guest mode fallback (should basically return empty or handle local persistence differently)
+        return [];
     }
-    return getLocalProfiles();
 };
 
-// Sync version for backwards compatibility (uses cached/local data)
-export const getAllProfilesSync = (): UserProfile[] => {
-    return getLocalProfiles();
+// Sync version for immediate reads (from cache only)
+export const getAllProfilesSync = (userId?: string): UserProfile[] => {
+    const cached = getCachedProfiles(userId);
+    return cached?.profiles || [];
 };
 
-export const createProfile = async (name: string, data: Resume = initialResume): Promise<UserProfile> => {
+export const createProfile = async (name: string, data: Resume = initialResume, userId?: string): Promise<UserProfile> => {
     const clonedData = JSON.parse(JSON.stringify(data));
     const resumeData = { ...clonedData, id: uuidv4() };
 
-    if (await isAuthenticated()) {
-        try {
-            const apiProfile = await api.createProfile(name, resumeData);
-            const profile = apiToUserProfile(apiProfile);
+    try {
+        const apiProfile = await api.createProfile(name, resumeData);
+        const profile = apiToUserProfile(apiProfile);
 
-            // Also save locally as cache
-            const localProfiles = getLocalProfiles();
-            localProfiles.push(profile);
-            saveLocalProfiles(localProfiles);
-
-            return profile;
-        } catch (error) {
-            console.error('Failed to create profile via API:', error);
-            throw error;
+        // Update cache with new profile
+        const cached = getCachedProfiles(userId);
+        if (cached) {
+            cached.profiles.push(profile);
+            updateCache(cached.profiles, userId);
+        } else {
+            invalidateCache(userId); // Force refresh on next read
         }
+
+        return profile;
+    } catch (error) {
+        console.error('Failed to create profile via API:', error);
+        throw error;
     }
-
-    // Local only
-    const localProfiles = getLocalProfiles();
-    if (localProfiles.length >= MAX_PROFILES) {
-        throw new Error(`Maximum of ${MAX_PROFILES} profiles reached.`);
-    }
-
-    const newProfile: UserProfile = {
-        id: uuidv4(),
-        name,
-        data: resumeData,
-        updatedAt: Date.now(),
-        isActive: localProfiles.length === 0, // First profile is active
-    };
-
-    localProfiles.push(newProfile);
-    saveLocalProfiles(localProfiles);
-    return newProfile;
 };
 
-export const saveProfile = async (profile: UserProfile): Promise<void> => {
-    if (await isAuthenticated()) {
-        try {
-            await api.updateProfile(profile.id, {
-                name: profile.name,
-                data: profile.data,
-                isActive: profile.isActive,
-            });
-        } catch (error) {
-            console.error('Failed to save profile via API:', error);
-        }
-    }
+export const saveProfile = async (profile: UserProfile, userId?: string): Promise<void> => {
+    try {
+        await api.updateProfile(profile.id, {
+            name: profile.name,
+            data: profile.data,
+            isActive: profile.isActive,
+        });
 
-    // Always update local cache
-    const profiles = getLocalProfiles();
-    const index = profiles.findIndex(p => p.id === profile.id);
-
-    if (index >= 0) {
-        profiles[index] = { ...profile, updatedAt: Date.now() };
-    } else {
-        if (profiles.length >= MAX_PROFILES) {
-            // If it's a new profile being saved (unlikely via this method but possible)
-            if (index === -1) profiles.push({ ...profile, updatedAt: Date.now() });
-        }
-    }
-
-    saveLocalProfiles(profiles);
-};
-
-export const deleteProfile = async (id: string): Promise<void> => {
-    // If authenticated, we rely on API mostly, but check local for "last profile" rule locally for speed or rely on API error
-    const authenticated = await isAuthenticated();
-    const profiles = authenticated ? await getAllProfiles() : getLocalProfiles();
-
-    if (profiles.length <= 1) {
-        throw new Error('Cannot delete the last profile.');
-    }
-
-    if (authenticated) {
-        try {
-            await api.deleteProfile(id);
-        } catch (error) {
-            console.error('Failed to delete profile via API:', error);
-            throw error;
-        }
-    }
-
-    // Update local cache
-    const localProfiles = getLocalProfiles();
-    const filtered = localProfiles.filter(p => p.id !== id);
-
-    // If we deleted the active profile, make the first one active
-    const wasActive = localProfiles.find(p => p.id === id)?.isActive;
-    if (wasActive && filtered.length > 0) {
-        filtered[0].isActive = true;
-        if (await isAuthenticated()) {
-            try {
-                await api.updateProfile(filtered[0].id, { isActive: true });
-            } catch (error) {
-                console.error('Failed to update active profile via API:', error);
+        // Update cache
+        const cached = getCachedProfiles(userId);
+        if (cached) {
+            const idx = cached.profiles.findIndex(p => p.id === profile.id);
+            if (idx >= 0) {
+                cached.profiles[idx] = { ...profile, updatedAt: Date.now() };
+                updateCache(cached.profiles, userId);
             }
         }
+    } catch (error) {
+        console.error('Failed to save profile via API:', error);
+        throw error;
     }
-
-    saveLocalProfiles(filtered);
 };
 
-export const setActiveProfileId = async (id: string): Promise<UserProfile | null> => {
-    // const profiles = isAuthenticated() ? await getAllProfiles() : getLocalProfiles(); // Unused
-    let activeProfile: UserProfile | null = null;
+export const deleteProfile = async (id: string, userId?: string): Promise<void> => {
+    try {
+        await api.deleteProfile(id);
 
-    if (await isAuthenticated()) {
-        try {
-            await api.updateProfile(id, { isActive: true });
-        } catch (e) {
-            console.error('Failed to set active profile via API', e);
+        // Update cache
+        const cached = getCachedProfiles(userId);
+        if (cached) {
+            cached.profiles = cached.profiles.filter(p => p.id !== id);
+            updateCache(cached.profiles, userId);
         }
+    } catch (error) {
+        console.error('Failed to delete profile via API:', error);
+        throw error;
     }
-
-    // Update local cache
-    const localProfiles = getLocalProfiles();
-    const updated = localProfiles.map(p => {
-        const isActive = p.id === id;
-        if (isActive) activeProfile = { ...p, isActive: true };
-        return {
-            ...p,
-            isActive
-        };
-    });
-
-    saveLocalProfiles(updated);
-    return activeProfile;
 };
 
-export const getActiveProfile = async (): Promise<UserProfile> => {
-    const profiles = await getAllProfiles();
+export const setActiveProfileId = async (id: string, userId?: string): Promise<UserProfile | null> => {
+    try {
+        await api.updateProfile(id, { isActive: true });
+
+        // Update cache - set all others inactive, this one active
+        const cached = getCachedProfiles(userId);
+        if (cached) {
+            cached.profiles = cached.profiles.map(p => ({
+                ...p,
+                isActive: p.id === id
+            }));
+            updateCache(cached.profiles, userId);
+
+            return cached.profiles.find(p => p.id === id) || null;
+        }
+
+        // No cache, fetch fresh
+        const profiles = await getAllProfiles(userId);
+        return profiles.find(p => p.id === id) || null;
+    } catch (e: any) {
+        console.error('Failed to set active profile via API', e);
+
+        // Self-Healing: If profile 404s (e.g. DB reset but exists in cache), recreate it!
+        if (e.response?.status === 404 || e.message?.includes('404') || e.message?.includes('not found')) {
+            console.log('[Storage] Profile 404 during activation, attempting recovery from cache...');
+
+            const cached = getCachedProfiles(userId);
+            const staleProfile = cached?.profiles.find(p => p.id === id);
+
+            if (staleProfile) {
+                try {
+                    // Re-create the profile on the server
+                    const newProfile = await api.createProfile(staleProfile.name, staleProfile.data);
+                    console.log('[Storage] Recovery successful, new ID:', newProfile.id);
+
+                    // Update cache: remove old stale ID, add new fresh ID, set active
+                    if (cached) {
+                        // Remove stale
+                        cached.profiles = cached.profiles.filter(p => p.id !== id);
+
+                        // Add new (mapped)
+                        const freshUserProfile = apiToUserProfile(newProfile);
+                        freshUserProfile.isActive = true; // Ensure active
+                        cached.profiles.push(freshUserProfile);
+
+                        // Ensure only one active
+                        cached.profiles = cached.profiles.map(p => ({
+                            ...p,
+                            isActive: p.id === freshUserProfile.id
+                        }));
+
+                        updateCache(cached.profiles, userId);
+                        return freshUserProfile;
+                    }
+                } catch (createErr) {
+                    console.error('[Storage] failed to recover stale profile:', createErr);
+                }
+            }
+        }
+
+        throw e;
+    }
+};
+
+export const getActiveProfile = async (userId?: string): Promise<UserProfile | null> => {
+    const profiles = await getAllProfiles(userId);
     const active = profiles.find(p => p.isActive);
 
     if (active) return active;
 
     // Fallback if no active profile found
     if (profiles.length > 0) {
-        await setActiveProfileId(profiles[0].id);
+        await setActiveProfileId(profiles[0].id, userId);
         return { ...profiles[0], isActive: true };
     }
 
-    // No profiles exist - create default
-    const defaultProfile = await createProfile('Default Profile');
-    await setActiveProfileId(defaultProfile.id);
-    return { ...defaultProfile, isActive: true };
+    // No profiles exist
+    return null;
 };
 
-// Sync version for backwards compatibility
-export const getActiveProfileSync = (): UserProfile => {
-    const profiles = getLocalProfiles();
-    const active = profiles.find(p => p.isActive);
-
-    if (active) return active;
-
-    if (profiles.length > 0) {
-        profiles[0].isActive = true;
-        saveLocalProfiles(profiles);
-        return profiles[0];
-    }
-
-    // Create default locally
-    const defaultProfile: UserProfile = {
-        id: uuidv4(),
-        name: 'Default Profile',
-        data: initialResume,
-        updatedAt: Date.now(),
-        isActive: true,
-    };
-    saveLocalProfiles([defaultProfile]);
-    return defaultProfile;
+// Sync version for immediate reads (from cache only)
+export const getActiveProfileSync = (userId?: string): UserProfile | null => {
+    const cached = getCachedProfiles(userId);
+    if (!cached) return null;
+    return cached.profiles.find(p => p.isActive) || cached.profiles[0] || null;
 };
 
-// Sync profiles from API to local storage (call after login)
-export const syncProfilesFromApi = async (): Promise<void> => {
-    if (!(await isAuthenticated())) return;
+export const saveResumeToProfile = async (resume: Resume, userId?: string): Promise<Resume> => {
+    const data = { ...resume }; // Clone to avoid mutation side-effects
+    const profileName = data.personalInfo?.fullName || 'My Resume';
 
     try {
-        const apiProfiles = await api.getProfiles();
-        const profiles = (apiProfiles as any[]).map(apiToUserProfile);
-        saveLocalProfiles(profiles);
-    } catch (error) {
-        console.error('Failed to sync profiles from API:', error);
-    }
-};
+        // 1. Identify Target Profile
+        // We trust resume.id if it exists, otherwise check active profile
+        let targetId = data.id;
 
-export const updateActiveProfileData = async (data: Resume): Promise<void> => {
-    const active = getActiveProfileSync();
-    const updatedProfile = { ...active, data, updatedAt: Date.now() };
+        // Optimistic update? No, let's be safe.
+        // If we don't strictly trust resume.id (it might be a uuidv4 generated locally), 
+        // we should check if it exists in our cache/DB.
+        // For now, let's assume we try to update.
 
-    // Update local storage manually
-    const profiles = getLocalProfiles();
-    const index = profiles.findIndex(p => p.id === active.id);
-    if (index >= 0) {
-        profiles[index] = updatedProfile;
-        saveLocalProfiles(profiles);
-    }
+        await api.updateProfile(targetId, {
+            data,
+            name: profileName,
+            isActive: true
+        });
 
-    // Sync to API
-    if (await isAuthenticated()) {
-        try {
-            await api.updateProfile(active.id, { data });
-        } catch (e) {
-            console.error('Failed to sync profile update to API:', e);
+        // Update Cache
+        const cached = getCachedProfiles(userId);
+        if (cached) {
+            const idx = cached.profiles.findIndex(p => p.id === targetId);
+            if (idx >= 0) {
+                cached.profiles[idx] = {
+                    ...cached.profiles[idx],
+                    name: profileName,
+                    data,
+                    updatedAt: Date.now(),
+                    isActive: true
+                };
+                updateCache(cached.profiles, userId);
+            } else {
+                // ID matches no cached profile? Might be new or cache stale.
+                invalidateCache(userId);
+            }
         }
+
+        return data;
+
+    } catch (error: any) {
+        console.error('[Storage] Save failed:', error);
+
+        // Self-Healing: Handle 404 (Not Found)
+        if (error.response?.status === 404 || error.message?.includes('404')) {
+            console.log('[Storage] Profile 404, recovering by creating new profile...');
+            try {
+                const newProfile = await api.createProfile(profileName, data);
+                console.log('[Storage] Recovery successful, new ID:', newProfile.id);
+
+                // Update Cache with new profile
+                const cached = getCachedProfiles(userId);
+                if (cached) {
+                    cached.profiles.push(apiToUserProfile(newProfile));
+                    // Mark others inactive? Logic for active profile implies yes.
+                    cached.profiles.forEach(p => p.isActive = (p.id === newProfile.id));
+                    updateCache(cached.profiles, userId);
+                } else {
+                    invalidateCache(userId);
+                }
+
+                // Return updated resume with NEW ID
+                return { ...data, id: newProfile.id };
+            } catch (createErr) {
+                console.error('[Storage] Recovery failed:', createErr);
+                throw createErr;
+            }
+        }
+
+        throw error;
     }
 };
 
-export const resetApplication = (): void => {
-    localStorage.clear();
-    window.location.reload();
+export const updateActiveProfileData = async (data: Resume, userId?: string): Promise<Resume> => {
+    return saveResumeToProfile(data, userId);
 };
 
-export const getProfileFromApi = async (): Promise<UserProfile | null> => {
-    if (!(await isAuthenticated())) return null;
+// ============ ONBOARDING STATUS (DB + Cache) ============
+
+export const getOnboardingStatus = async (userId?: string): Promise<boolean> => {
+    // Try cache first
+    const cached = getCachedProfiles(userId);
+    if (cached && cached.profiles.length > 0) {
+        const activeProfile = cached.profiles.find(p => p.isActive) || cached.profiles[0];
+        return activeProfile?.hasCompletedOnboarding ?? false;
+    }
+
+    // Fetch from API
+    try {
+        const profiles = await api.getProfiles();
+        if (!profiles || profiles.length === 0) return false;
+        // Check the first/active profile's onboarding status
+        const activeProfile = (profiles as any[]).find((p: any) => p.isActive) || profiles[0];
+        return activeProfile?.hasCompletedOnboarding ?? false;
+    } catch (error) {
+        console.error('[Storage] Failed to get onboarding status:', error);
+        return false;
+    }
+};
+
+export const completeOnboarding = async (userId?: string): Promise<void> => {
+    try {
+        const profiles = await api.getProfiles();
+        if (profiles && profiles.length > 0) {
+            const activeProfile = (profiles as any[]).find((p: any) => p.isActive) || profiles[0];
+            await api.updateProfile(activeProfile.id, { hasCompletedOnboarding: true });
+            console.log('[Storage] Marked onboarding complete for profile:', activeProfile.id);
+
+            // Update cache
+            const cached = getCachedProfiles(userId);
+            if (cached) {
+                const idx = cached.profiles.findIndex(p => p.id === activeProfile.id);
+                if (idx >= 0) {
+                    cached.profiles[idx].hasCompletedOnboarding = true;
+                    updateCache(cached.profiles, userId);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('[Storage] Failed to complete onboarding:', error);
+        throw error;
+    }
+};
+
+export const getProfileFromApi = async (userId: string): Promise<UserProfile | null> => {
     try {
         const profiles = await api.getProfiles();
         const active = (profiles as any[]).find((p: any) => p.isActive);
         const target = active || profiles[0];
 
         if (target) {
-            return apiToUserProfile(target);
+            const profile = apiToUserProfile(target);
+            // Update cache with fresh data scoped to user
+            const allProfiles = (profiles as any[]).map(apiToUserProfile);
+            updateCache(allProfiles, userId);
+            return profile;
         }
         return null;
     } catch (e) {
         console.error('Failed to get profile from API:', e);
         return null;
     }
+};
+
+// ============ UTILITY FUNCTIONS ============
+
+export const resetApplication = (): void => {
+    clearCache();
+    window.location.reload();
+};
+
+// Clear all local data (call on logout)
+export const clearLocalData = (): void => {
+    clearCache();
+    console.log('[Storage] Local data cleared');
 };

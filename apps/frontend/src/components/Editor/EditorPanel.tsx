@@ -19,8 +19,10 @@ import { ConfirmModal } from '../UI/ConfirmModal';
 import { Download, FileText, Users, Wand2, XCircle, Save } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ResumePDF } from '../PDF/ResumePDF';
-import { v4 } from 'uuid';
+// import { v4 } from 'uuid'; // Currently unused
 import * as api from '../../services/apiApplication';
+import { saveResumeToProfile } from '../../services/storage';
+import { useAuth } from '../../context/AuthContext';
 import {
     DndContext,
     closestCenter,
@@ -47,6 +49,7 @@ import { calculateDeepMatchScore, createProfile } from '../../services/api'; imp
 export const EditorPanel = () => {
 
     const { resume, dispatch } = useResume();
+    const { user } = useAuth();
     const { addToast } = useToast();
     const [isCoverLetterModalOpen, setIsCoverLetterModalOpen] = useState(false);
     const [isProfileManagerOpen, setIsProfileManagerOpen] = useState(false);
@@ -70,7 +73,7 @@ export const EditorPanel = () => {
         jobDescPreview: resume.tailoringJob?.description?.substring(0, 50)
     });
 
-    const { score: fastScore, isReady: isModelReady, isLoading: isModelLoading, error: modelError, retry: retryModel } = useRealtimeMatch(
+    const { score: fastScore, isReady: _isModelReady, isLoading: isModelLoading, error: modelError, retry: retryModel } = useRealtimeMatch(
         resumeText || '',
         resume.tailoringJob?.description || ''
     );
@@ -121,19 +124,6 @@ export const EditorPanel = () => {
         variant?: 'danger' | 'warning' | 'info';
     } | null>(null);
 
-    const handleDiscardTailoring = () => {
-        setConfirmModal({
-            title: 'Discard Tailoring?',
-            message: 'Are you sure you want to discard all tailoring changes? This action cannot be undone.',
-            confirmText: 'Discard Changes',
-            variant: 'danger',
-            onConfirm: () => {
-                dispatch({ type: 'DISCARD_TAILORING' });
-                setShowATSScore(false);
-            }
-        });
-    };
-
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     const handleDownload = async () => {
@@ -164,6 +154,30 @@ export const EditorPanel = () => {
             addToast('error', 'Failed to generate PDF. Please try again.');
         } finally {
             setIsGeneratingPDF(false);
+        }
+    };
+
+    // Explicit Save for Base Profile
+    const [isSaving, setIsSaving] = useState(false);
+    const handleSaveProfile = async () => {
+        setIsSaving(true);
+        try {
+            // Use storage service which allows self-healing and cache updates
+            const updatedResume = await saveResumeToProfile(resume, user?.id);
+
+            // If ID changed (self-healing), update context
+            if (updatedResume.id !== resume.id) {
+                dispatch({
+                    type: 'SET_RESUME',
+                    payload: updatedResume
+                });
+            }
+            addToast('success', 'Profile saved successfully');
+        } catch (error: any) {
+            console.error('Save failed:', error);
+            addToast('error', 'Failed to save profile');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -335,6 +349,7 @@ export const EditorPanel = () => {
 
                     <button
                         onClick={handleStartTailoring}
+                        data-tour="tailor-button"
                         className={`p-2 rounded-lg transition-all flex items-center gap-1 ${resume.isTailoring ? 'text-indigo-400 bg-indigo-900/20' : 'text-gray-400 hover:text-indigo-400 hover:bg-indigo-900/20'}`}
                         title="Tailor Resume"
                     >
@@ -357,6 +372,17 @@ export const EditorPanel = () => {
                         <Download size={16} />
                         {isGeneratingPDF ? 'Generating...' : 'Download PDF'}
                     </button>
+
+                    {!resume.isTailoring && (
+                        <button
+                            onClick={handleSaveProfile}
+                            disabled={isSaving}
+                            className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all shadow-sm hover:shadow-md font-medium text-sm ${isSaving ? 'bg-green-800 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'}`}
+                        >
+                            <Save size={16} />
+                            {isSaving ? 'Saving...' : 'Save Profile'}
+                        </button>
+                    )}
                 </div>
             </div>
 

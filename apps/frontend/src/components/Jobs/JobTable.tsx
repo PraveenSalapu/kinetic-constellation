@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useResume } from '../../context/ResumeContext';
-import { WifiOff, Calendar, RefreshCw, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { WifiOff, RefreshCw, ArrowUpDown, ArrowDown, ArrowUp, Filter, Search } from 'lucide-react';
 import { fetchJobsFromDB } from '../../services/database/supabase';
 import { refreshMatchScores } from '../../services/api';
 import type { Job } from '../../types';
+import { JobCard } from './JobCard';
 
 // 1. CONFIGURATION
 // (N8N logic replaced by Supabase)
@@ -18,7 +19,11 @@ const MOCK_JOBS: Job[] = [
         link: "https://example.com/job/1",
         match_score: 92,
         missing_skills: [],
-        summary: "Leading the development of our core AI infrastructure. Looking for strong React and Node.js experience. Great fit for your background in full-stack development."
+        summary: "Leading the development of our core AI infrastructure. Looking for strong React and Node.js experience. Great fit for your background in full-stack development.",
+        location: "San Francisco, CA",
+        jobType: "Full-time",
+        experienceLevel: "Senior",
+        salary: "$180k - $250k"
     },
     {
         company: "TechFlow Corp",
@@ -26,7 +31,11 @@ const MOCK_JOBS: Job[] = [
         link: "https://example.com/job/2",
         match_score: 78,
         missing_skills: ["Kubernetes", "Go"],
-        summary: "Building high-scale distributed systems. Requires strong knowledge of microservices architecture. You match 80% of the requirements but missing Go experience."
+        summary: "Building high-scale distributed systems. Requires strong knowledge of microservices architecture. You match 80% of the requirements but missing Go experience.",
+        location: "Remote",
+        jobType: "Contract",
+        experienceLevel: "Mid Level",
+        salary: "$60/hr"
     },
     {
         company: "Creative Solutions Inc",
@@ -34,7 +43,11 @@ const MOCK_JOBS: Job[] = [
         link: "https://example.com/job/3",
         match_score: 65,
         missing_skills: ["GraphQL", "Webpack", "Figma"],
-        summary: "We need a design-minded engineer to overhaul our UI library. Your profile lacks specific design tool experience mentioned in the JD."
+        summary: "We need a design-minded engineer to overhaul our UI library. Your profile lacks specific design tool experience mentioned in the JD.",
+        location: "New York, NY",
+        jobType: "Full-time",
+        experienceLevel: "Lead",
+        salary: "$200k+"
     }
 ];
 
@@ -46,13 +59,28 @@ export const JobTable: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [refreshingScores, setRefreshingScores] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+
     const [usingMockData, setUsingMockData] = useState<boolean>(false);
+
+    // Sorting & Filtering State
     const [sortField, setSortField] = useState<SortField>('match_score');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+    const [filterExp, setFilterExp] = useState<string>('');
+    const [filterType, setFilterType] = useState<string>('');
+    const [filterCategory, setFilterCategory] = useState<string>('');
+
     const { resume, dispatch } = useResume();
 
-    // Sort jobs based on current sort settings
-    const sortedJobs = [...jobs].sort((a, b) => {
+    // Filter Jobs
+    const filteredJobs = jobs.filter(job => {
+        if (filterExp && job.experienceLevel && job.experienceLevel !== filterExp) return false;
+        if (filterType && job.jobType && job.jobType !== filterType) return false;
+        if (filterCategory && job.category && job.category !== filterCategory) return false;
+        return true;
+    });
+
+    // Sort Jobs
+    const sortedJobs = [...filteredJobs].sort((a, b) => {
         let comparison = 0;
         switch (sortField) {
             case 'match_score':
@@ -77,11 +105,6 @@ export const JobTable: React.FC = () => {
         }
     };
 
-    const getSortIcon = (field: SortField) => {
-        if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-50" />;
-        return sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />;
-    };
-
     const handleTailor = (job: Job) => {
         dispatch({
             type: 'START_TAILORING',
@@ -94,6 +117,63 @@ export const JobTable: React.FC = () => {
                 }
             }
         });
+    };
+
+    // HANDLE APPLY (STAGES AUTOFILL)
+    const handleApply = async (job: Job) => {
+        if (!job.link) return;
+
+        // 1. Determine which resume to use
+        // If we are currently tailoring THIS job, use the tailored state.
+        // Otherwise used the saved profile.
+        let resumeToUse = resume;
+        const isTailoringThisJob = resume.isTailoring &&
+            (resume.tailoringJob?.link === job.link ||
+                resume.tailoringJob?.company === job.company);
+
+        // Notify user
+        const toastId = `apply-${Date.now()}`;
+        // Note: effectively we'd want a toast here but I don't have addToast handy in this scope comfortably
+        // changing console log to debug
+        console.log("Applying to:", job.company, "Tailored:", isTailoringThisJob);
+
+        try {
+            // Stage for Extension (Mirroring PreviewPanel logic + LocalStorage Fallback)
+            const payload = {
+                jobUrl: job.link,
+                jobTitle: job.title,
+                company: job.company,
+                tailoredResume: isTailoringThisJob ? resume : null, // If null, backend/extension uses profile
+                timestamp: Date.now()
+            };
+
+            // A. Try API (Persistent Staging)
+            try {
+                await fetch('/api/autofill/pending', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                console.warn("API Autofill stage failed, falling back to local storage", e);
+            }
+
+            // B. LocalStorage Fallback (Immediate/Extension Access)
+            localStorage.setItem('EXTENSION_AUTOFILL_DATA', JSON.stringify(payload));
+
+            // C. Post Message (Direct Extension Communication)
+            window.postMessage({
+                type: 'EXTENSION_AUTOFILL',
+                payload: payload
+            }, '*');
+
+            // D. Open Job
+            window.open(job.link, '_blank');
+
+        } catch (err) {
+            console.error("Apply failed", err);
+            window.open(job.link, '_blank'); // Fallback open anyway
+        }
     };
 
     // 5. UPDATE: Fetch from Supabase (BackendDB) instead of direct API
@@ -133,207 +213,136 @@ export const JobTable: React.FC = () => {
             await handleFetchJobs();
         } catch (err: any) {
             console.error("Failed to refresh scores:", err);
-            // Don't show error for auth issues - user might not be logged in
         } finally {
             setRefreshingScores(false);
         }
     };
 
+    // Init Logic
     useEffect(() => {
         handleFetchJobs();
-    }, [resume]); // Re-fetch only if resume changes (though DB jobs are universal, match scores might be personalized later)
+    }, []);
 
-    // 4. RENDERING HELPERS
-    const getScoreColor = (score: number) => {
-        if (score >= 80) return "bg-green-900/20 text-green-400 border-green-800";
-        if (score >= 50) return "bg-yellow-900/20 text-yellow-400 border-yellow-800";
-        return "bg-red-900/20 text-red-400 border-red-800";
-    };
-
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-full min-h-[500px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                <span className="ml-3 text-gray-400">Scanning live jobs...</span>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="p-8 flex justify-center items-center h-full">
-                <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-400 max-w-lg text-center">
-                    <h3 className="font-bold mb-2">Connection Error</h3>
-                    <p>{error}</p>
-                    <p className="text-sm mt-2 text-red-500">Make sure your local n8n instance is running and the webhook URL is correct.</p>
-                </div>
-            </div>
-        );
-    }
+    // Extract unique filter options
+    const uniqueExpLevels = Array.from(new Set(jobs.map(j => j.experienceLevel).filter(Boolean)));
+    const uniqueJobTypes = Array.from(new Set(jobs.map(j => j.jobType).filter(Boolean)));
+    const uniqueCategories = Array.from(new Set(jobs.map(j => j.category).filter(Boolean)));
 
     return (
-        <div className="p-6 bg-[#111] min-h-screen w-full font-mono text-gray-200">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                            <span className="text-3xl">🚀</span> Live Job Board
-                        </h1>
-                        <p className="text-sm text-gray-400 flex items-center gap-2">
-                            Matches for: <span className="font-semibold text-green-400 bg-green-900/20 border border-green-800 px-2 py-0.5 rounded">{resume.personalInfo.fullName || "Current Profile"}</span>
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleRefreshScores}
-                            disabled={refreshingScores}
-                            className="bg-green-900/40 hover:bg-green-900/60 text-green-300 border border-green-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
-                            title="Recalculate match scores based on your current profile"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${refreshingScores ? 'animate-spin' : ''}`} />
-                            <span>{refreshingScores ? 'Calculating...' : 'Refresh Scores'}</span>
-                        </button>
-                        <button
-                            onClick={handleFetchJobs}
-                            className="bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 border border-purple-800 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-                        >
-                            <Calendar className="w-4 h-4" />
-                            <span>Refresh Jobs</span>
-                        </button>
-                    </div>
+        <div className="h-full flex flex-col bg-[#0F0F0F] font-sans">
+            {/* Header / Toolbar */}
+            <div className="p-6 border-b border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        Job Board
+                        <span className="text-sm font-normal text-gray-500 bg-gray-900 border border-gray-800 px-2 py-0.5 rounded-full">
+                            {jobs.length} found
+                        </span>
+                    </h1>
+                    <p className="text-gray-400 text-sm mt-1">AI-curated opportunities matching your profile.</p>
                 </div>
 
-                {usingMockData && (
-                    <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-800 rounded-lg flex items-center gap-3 text-yellow-200 animate-in fade-in slide-in-from-top-2">
-                        <WifiOff size={20} />
-                        <div>
-                            <p className="text-sm font-bold">Demo Mode Active</p>
-                            <p className="text-xs text-yellow-400/80">Live n8n connection unavailable. Showing sample data for demonstration.</p>
-                        </div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleRefreshScores}
+                        disabled={refreshingScores}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-700 hover:border-indigo-500 text-gray-300 rounded-lg transition-all"
+                    >
+                        <RefreshCw size={16} className={`${refreshingScores ? 'animate-spin' : ''}`} />
+                        {refreshingScores ? 'Calculating Matches...' : 'Refresh Matches'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Filters Row */}
+            <div className="px-6 py-4 border-b border-gray-800/50 bg-[#121215] flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-gray-500 text-sm mr-2">
+                    <Filter size={16} /> Filters:
+                </div>
+
+                <select
+                    value={filterExp}
+                    onChange={e => setFilterExp(e.target.value)}
+                    className="bg-[#1a1a1e] text-gray-300 text-sm px-3 py-1.5 rounded-md border border-gray-700 outline-none focus:border-indigo-500"
+                >
+                    <option value="">All Experience</option>
+                    {uniqueExpLevels.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+
+                <select
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                    className="bg-[#1a1a1e] text-gray-300 text-sm px-3 py-1.5 rounded-md border border-gray-700 outline-none focus:border-indigo-500"
+                >
+                    <option value="">All Job Types</option>
+                    {uniqueJobTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+
+                <select
+                    value={filterCategory}
+                    onChange={e => setFilterCategory(e.target.value)}
+                    className="bg-[#1a1a1e] text-gray-300 text-sm px-3 py-1.5 rounded-md border border-gray-700 outline-none focus:border-indigo-500"
+                >
+                    <option value="">All Categories</option>
+                    {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+
+                <div className="flex-1"></div>
+
+                {/* Sorting */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Sort By</span>
+                    <button
+                        onClick={() => toggleSort('match_score')}
+                        className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors ${sortField === 'match_score' ? 'bg-indigo-900/40 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Match {sortField === 'match_score' && <ArrowDown size={12} />}
+                    </button>
+                    <button
+                        onClick={() => toggleSort('created_at')}
+                        className={`px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors ${sortField === 'created_at' ? 'bg-indigo-900/40 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Newest {sortField === 'created_at' && <ArrowDown size={12} />}
+                    </button>
+                </div>
+            </div>
+
+            {/* Error / Mock Banner */}
+            {usingMockData && (
+                <div className="bg-amber-900/20 border-b border-amber-900/50 px-6 py-2 flex items-center gap-2 text-amber-500 text-sm">
+                    <WifiOff size={16} />
+                    <span>Viewing offline/demo data. {error}</span>
+                </div>
+            )}
+
+            {/* Content Area - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                        <RefreshCw className="animate-spin text-indigo-500" size={32} />
+                        <p className="text-gray-500">Scanning neural network for opportunities...</p>
+                    </div>
+                ) : filteredJobs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                        <p>No jobs found matching filters.</p>
+                        <button
+                            onClick={() => { setFilterExp(''); setFilterType(''); setFilterCategory(''); }}
+                            className="mt-4 text-indigo-400 hover:text-indigo-300"
+                        >
+                            Clear Filters
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-4 max-w-5xl mx-auto">
+                        {sortedJobs.map((job, idx) => (
+                            <JobCard
+                                key={idx}
+                                job={job}
+                                onTailor={handleTailor}
+                            />
+                        ))}
                     </div>
                 )}
-
-                {/* AIRTABLE-STYLE CONTAINER */}
-                <div className="bg-[#1a1a1a] border border-gray-800 shadow-sm rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-800">
-
-                            {/* TABLE HEADER */}
-                            <thead className="bg-[#222]">
-                                <tr>
-                                    <th
-                                        scope="col"
-                                        className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800 cursor-pointer hover:bg-[#2a2a2a] transition-colors"
-                                        onClick={() => toggleSort('match_score')}
-                                    >
-                                        <span className="flex items-center gap-1">
-                                            Match {getSortIcon('match_score')}
-                                        </span>
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800 cursor-pointer hover:bg-[#2a2a2a] transition-colors"
-                                        onClick={() => toggleSort('company')}
-                                    >
-                                        <span className="flex items-center gap-1">
-                                            Role & Company {getSortIcon('company')}
-                                        </span>
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
-                                        Missing Skills
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider border-r border-gray-800">
-                                        AI Summary
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            {/* TABLE BODY */}
-                            <tbody className="bg-[#1a1a1a] divide-y divide-gray-800">
-                                {sortedJobs.map((job, index) => (
-                                    <tr key={job.id || index} className="hover:bg-[#252525] transition-colors duration-150 ease-in-out group">
-
-                                        {/* SCORE COLUMN */}
-                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-800">
-                                            <span className={`px-3 py-1 inline-flex text-sm leading-5 font-bold rounded-full border ${getScoreColor(job.match_score)}`}>
-                                                {job.match_score}%
-                                            </span>
-                                        </td>
-
-                                        {/* ROLE COLUMN */}
-                                        <td className="px-6 py-4 whitespace-nowrap border-r border-gray-800">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-semibold text-gray-200">{job.title}</span>
-                                                <span className="text-sm text-gray-500">{job.company}</span>
-                                            </div>
-                                        </td>
-
-                                        {/* SKILLS COLUMN (TAGS) */}
-                                        <td className="px-6 py-4 border-r border-gray-800 max-w-xs">
-                                            <div className="flex flex-wrap gap-2">
-                                                {job.missing_skills.length > 0 ? (
-                                                    job.missing_skills.map((skill, i) => (
-                                                        <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-red-900/20 text-red-400 border border-red-800">
-                                                            {skill}
-                                                        </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-900/20 text-green-400 border border-green-800">
-                                                        Perfect Match
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-
-                                        {/* SUMMARY COLUMN */}
-                                        <td className="px-6 py-4 text-sm text-gray-500 border-r border-gray-800 max-w-xs relative group">
-                                            <div className="line-clamp-2">{job.summary}</div>
-                                            {/* Hover Tooltip */}
-                                            <div className="hidden group-hover:block absolute z-10 left-0 top-full mt-1 p-3 bg-gray-900 border border-gray-700 shadow-xl rounded-lg w-72 text-sm text-gray-300 whitespace-normal">
-                                                {job.summary}
-                                            </div>
-                                        </td>
-
-                                        {/* APPLY BUTTON */}
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2">
-                                            <a
-                                                href={job.link}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors shadow-sm text-xs uppercase font-bold tracking-wide"
-                                            >
-                                                Apply
-                                            </a>
-                                            <button
-                                                onClick={() => handleTailor(job)}
-                                                className="text-indigo-300 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-800 px-3 py-1.5 rounded-md transition-colors text-xs font-bold tracking-wide flex items-center gap-1"
-                                                title="Tailor Resume for this Job"
-                                            >
-                                                <span className="mr-1">✨</span> Tailor
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {/* EMPTY STATE */}
-                        {jobs.length === 0 && !loading && (
-                            <div className="text-center py-16">
-                                <div className="mx-auto h-12 w-12 text-gray-600 mb-4">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
-                                </div>
-                                <h3 className="mt-2 text-sm font-medium text-gray-300">No jobs found</h3>
-                                <p className="mt-1 text-sm text-gray-600">We couldn't find any new listings in the last 24 hours.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
             </div>
         </div>
     );

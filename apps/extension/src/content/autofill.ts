@@ -1,7 +1,7 @@
 // Auto-Fill Engine
 // Detects form fields and fills them with resume data
 
-import type { Resume, PersonalInfo } from '@careerflow/shared';
+import type { Resume, PersonalInfo, EssayQuestion } from '@careerflow/shared';
 
 export type FieldPurpose =
   | 'first_name'
@@ -13,8 +13,24 @@ export type FieldPurpose =
   | 'linkedin'
   | 'website'
   | 'github'
+  | 'gender'
+  | 'race'
+  | 'veteran'
+  | 'disability'
+  | 'pronouns'
+  | 'sexual_orientation'
+  | 'hispanic'
+  | 'is_lgbtq'
+  | 'availability'
+  | 'salary'
+  | 'relocation'
   | 'resume'
   | 'cover_letter'
+  | 'work_authorization'
+  | 'sponsorship'
+  | 'country'
+  | 'non_compete'
+  | 'referral_source'
   | 'unknown';
 
 export interface FormField {
@@ -87,6 +103,55 @@ const FIELD_PATTERNS: Record<FieldPurpose, RegExp[]> = {
     /github/i,
     /git.?hub/i,
   ],
+  gender: [
+    /gender/i,
+    /sex\b/i, // Match "sex" word boundary
+  ],
+  race: [
+    /race/i,
+    /ethnicity/i,
+  ],
+  veteran: [
+    /veteran/i,
+    /military/i,
+    /armed forces/i,
+  ],
+  disability: [
+    /disability/i,
+    /handicap/i,
+  ],
+  pronouns: [
+    /pronoun/i,
+  ],
+  sexual_orientation: [
+    /sexual.?orientation/i,
+  ],
+  is_lgbtq: [
+    /lgbt/i,
+  ],
+  hispanic: [
+    /hispanic/i,
+    /latino/i,
+    /spanish.?origin/i
+  ],
+  availability: [
+    /start.?date/i,
+    /notice.?period/i,
+    /available/i,
+    /earliest/i,
+    /when.*start/i,
+  ],
+  salary: [
+    /salary/i,
+    /pay/i,
+    /compensation/i,
+    /rate/i,
+    /expect.*range/i
+  ],
+  relocation: [
+    /relocate/i,
+    /relocation/i,
+  ],
   resume: [
     /resume/i,
     /\bcv\b/i, // Match "CV" as whole word only
@@ -97,13 +162,46 @@ const FIELD_PATTERNS: Record<FieldPurpose, RegExp[]> = {
     /coverletter/i,
     /\bcover\b.*\bletter\b/i,
   ],
+  work_authorization: [
+    /work.*(authorization|eligib)/i,
+    /legally.*(work|eligible)/i,
+    /authorized.*work/i,
+    /eligible.*work/i,
+    /right.*work/i,
+    /work.*status/i,
+  ],
+  sponsorship: [
+    /sponsor/i,
+    /visa.*support/i,
+    /immigration/i,
+    /require.*visa/i,
+  ],
+  country: [
+    /country/i,
+    /nation/i,
+    /citizenship/i,
+    /where.*located/i,
+  ],
+  non_compete: [
+    /non.?compete/i,
+    /non.?competition/i,
+    /compete.*agreement/i,
+    /restrictive.*covenant/i,
+  ],
+  referral_source: [
+    /how.*hear/i,
+    /where.*hear/i,
+    /how.*find.*us/i,
+    /referr/i,
+    /source/i,
+  ],
   unknown: [],
 };
 
 // Fields that should only match SHORT input fields, NOT textareas
 const SHORT_FIELD_PURPOSES: FieldPurpose[] = [
   'first_name', 'last_name', 'full_name', 'email', 'phone',
-  'location', 'linkedin', 'website', 'github'
+  'location', 'linkedin', 'website', 'github', 'salary', 'availability'
 ];
 
 // Detect the purpose of a form field
@@ -264,7 +362,10 @@ function isElementVisible(element: HTMLElement): boolean {
 }
 
 // Get value to fill based on field purpose and resume data
-function getValueForField(purpose: FieldPurpose, personalInfo: PersonalInfo): string | null {
+function getValueForField(purpose: FieldPurpose, resume: Resume): string | null {
+  const { personalInfo } = resume;
+  const demographics: any = (resume as any).demographics || {}; // Handle extended types
+
   switch (purpose) {
     case 'first_name':
       return personalInfo.fullName.split(' ')[0] || null;
@@ -285,6 +386,51 @@ function getValueForField(purpose: FieldPurpose, personalInfo: PersonalInfo): st
       return personalInfo.website || null;
     case 'github':
       return personalInfo.github || null;
+    // Demographics
+    case 'gender':
+      return demographics.gender || null;
+    case 'race':
+      return demographics.race || null;
+    case 'veteran':
+      return demographics.veteranStatus || null;
+    case 'disability':
+      return demographics.disabilityStatus || null;
+    case 'pronouns':
+      return demographics.pronouns || null;
+    case 'sexual_orientation':
+      return demographics.sexualOrientation || null;
+    case 'hispanic':
+      return demographics.isHispanic || null;
+    case 'is_lgbtq':
+      return demographics.isLGBTQ || null;
+
+    // Logistics
+    case 'availability':
+      return demographics.availability || null;
+    case 'salary':
+      return demographics.salaryExpectation || null;
+    case 'relocation':
+      return demographics.relocation || null;
+
+    // Authorization
+    case 'work_authorization':
+      return demographics.workAuthorization || 'Yes'; // Default to yes
+    case 'sponsorship':
+      return demographics.requiresSponsorship ? 'Yes' : 'No';
+    case 'country':
+      // Try to extract country from location field (e.g., "San Francisco, CA, USA")
+      const location = personalInfo.location || '';
+      if (/usa|united states|u\.s\./i.test(location)) return 'United States';
+      if (/india/i.test(location)) return 'India';
+      if (/uk|united kingdom|england/i.test(location)) return 'United Kingdom';
+      if (/canada/i.test(location)) return 'Canada';
+      if (/germany/i.test(location)) return 'Germany';
+      // Return location as-is if we can't extract country
+      return location || null;
+    case 'non_compete':
+      return 'No'; // Most people don't have non-competes
+    case 'referral_source':
+      return demographics.referralSource || 'Job Board'; // Default to job board
     default:
       return null;
   }
@@ -305,19 +451,55 @@ async function fillSingleField(field: FormField, value: string): Promise<boolean
     el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
 
     if (field.type === 'select' && el instanceof HTMLSelectElement) {
-      // Find matching option
-      const options = Array.from(el.options);
-      const matchingOption = options.find(
+      // Find matching option with multiple strategies
+      const options = Array.from(el.options).filter(opt => opt.value !== ''); // Exclude empty placeholder
+      const valueLower = value.toLowerCase();
+
+      // Strategy 1: Exact match
+      let matchingOption = options.find(
         opt =>
-          opt.text.toLowerCase().includes(value.toLowerCase()) ||
-          opt.value.toLowerCase().includes(value.toLowerCase())
+          opt.text.toLowerCase() === valueLower ||
+          opt.value.toLowerCase() === valueLower
       );
+
+      // Strategy 2: Contains match
+      if (!matchingOption) {
+        matchingOption = options.find(
+          opt =>
+            opt.text.toLowerCase().includes(valueLower) ||
+            opt.value.toLowerCase().includes(valueLower) ||
+            valueLower.includes(opt.text.toLowerCase())
+        );
+      }
+
+      // Strategy 3: For Yes/No questions, try various affirmative/negative patterns
+      if (!matchingOption) {
+        if (valueLower === 'yes' || valueLower === 'true') {
+          matchingOption = options.find(opt =>
+            /^yes$/i.test(opt.text.trim()) ||
+            /^true$/i.test(opt.value) ||
+            /i (am|do|have|will)/i.test(opt.text)
+          );
+        } else if (valueLower === 'no' || valueLower === 'false') {
+          matchingOption = options.find(opt =>
+            /^no$/i.test(opt.text.trim()) ||
+            /^false$/i.test(opt.value) ||
+            /i (am not|do not|don't|have not|won't)/i.test(opt.text)
+          );
+        }
+      }
 
       if (matchingOption) {
         el.value = matchingOption.value;
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        // Also dispatch input event for React-based forms
+        el.dispatchEvent(new Event('input', { bubbles: true }));
         return true;
       }
+
+      // Highlight if we couldn't find a match
+      console.log(`[CareerFlow] Could not find matching option for "${value}" in:`, options.map(o => o.text));
+      highlightElement(el, `⚠️ Please select: ${value}`);
       return false;
     }
 
@@ -417,7 +599,6 @@ export async function fillFormFields(
   onProgress?: (progress: FillProgress) => void
 ): Promise<{ filled: number; total: number; skipped: FieldPurpose[] }> {
   const fields = detectFormFields();
-  const personalInfo = resume.personalInfo;
 
   let filled = 0;
   const skipped: FieldPurpose[] = [];
@@ -427,7 +608,7 @@ export async function fillFormFields(
 
   for (let i = 0; i < fillableFields.length; i++) {
     const field = fillableFields[i];
-    const value = getValueForField(field.purpose, personalInfo);
+    const value = getValueForField(field.purpose, resume);
 
     let success = false;
 
@@ -480,7 +661,7 @@ export async function fillFormFields(
 
 // Quick fill with just personal info (no AI tailoring)
 export async function quickFill(
-  personalInfo: PersonalInfo,
+  resume: Resume, // Changed from PersonalInfo to Resume
   onProgress?: (progress: FillProgress) => void
 ): Promise<{ filled: number; total: number }> {
   const fields = detectFormFields();
@@ -492,7 +673,7 @@ export async function quickFill(
 
   for (let i = 0; i < fillableFields.length; i++) {
     const field = fillableFields[i];
-    const value = getValueForField(field.purpose, personalInfo);
+    const value = getValueForField(field.purpose, resume);
 
     let success = false;
     if (value) {
@@ -652,4 +833,290 @@ export function getResumeFileInputs(): HTMLInputElement[] {
       return !accept || accept.includes('pdf') || accept.includes('*');
     })
     .map(f => f.element as HTMLInputElement);
+}
+
+// ============================================
+// Essay Question Detection and Filling
+// ============================================
+
+/**
+ * Extract the question text from a textarea element by checking various sources
+ */
+function extractQuestionText(element: HTMLElement): string {
+  // 1. Check aria-labelledby (most reliable for complex labels)
+  const labelledBy = element.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const labelElement = document.getElementById(labelledBy);
+    if (labelElement) {
+      const text = labelElement.textContent?.trim();
+      if (text && text.length > 10) return text;
+    }
+  }
+
+  // 2. Check aria-label
+  const ariaLabel = element.getAttribute('aria-label');
+  if (ariaLabel && ariaLabel.length > 10) {
+    return ariaLabel;
+  }
+
+  // 3. Check for associated label via 'for' attribute
+  const id = element.getAttribute('id');
+  if (id) {
+    const label = document.querySelector(`label[for="${id}"]`);
+    if (label) {
+      const text = label.textContent?.trim();
+      if (text && text.length > 10) return text;
+    }
+  }
+
+  // 4. Check parent/ancestor labels
+  let parent = element.parentElement;
+  let depth = 0;
+  while (parent && depth < 5) {
+    // Check for label as direct parent
+    if (parent.tagName === 'LABEL') {
+      const text = parent.textContent?.trim();
+      if (text && text.length > 10) return text;
+    }
+
+    // Check for label-like elements (common in custom form designs)
+    const labelLike = parent.querySelector('.field-label, .question-label, .form-label, [class*="label"], legend, h3, h4');
+    if (labelLike) {
+      const text = labelLike.textContent?.trim();
+      if (text && text.length > 10) return text;
+    }
+
+    parent = parent.parentElement;
+    depth++;
+  }
+
+  // 5. Check placeholder
+  const placeholder = element.getAttribute('placeholder');
+  if (placeholder && placeholder.length > 10) {
+    return placeholder;
+  }
+
+  // 6. Check name attribute (last resort, format it nicely)
+  const name = element.getAttribute('name');
+  if (name) {
+    return name.replace(/[_-]/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+  }
+
+  return 'Essay question';
+}
+
+/**
+ * Generate a unique CSS selector for an element
+ */
+function generateUniqueSelector(element: HTMLElement): string {
+  // 1. Try ID (most reliable)
+  if (element.id) {
+    return `#${CSS.escape(element.id)}`;
+  }
+
+  // 2. Try data attributes
+  const dataTestId = element.getAttribute('data-testid');
+  if (dataTestId) {
+    return `[data-testid="${CSS.escape(dataTestId)}"]`;
+  }
+
+  const dataId = element.getAttribute('data-id');
+  if (dataId) {
+    return `[data-id="${CSS.escape(dataId)}"]`;
+  }
+
+  // 3. Try name attribute
+  const name = element.getAttribute('name');
+  if (name) {
+    return `textarea[name="${CSS.escape(name)}"]`;
+  }
+
+  // 4. Build positional selector
+  const tagName = element.tagName.toLowerCase();
+  const parent = element.parentElement;
+  if (parent) {
+    const siblings = Array.from(parent.querySelectorAll(`:scope > ${tagName}`));
+    const index = siblings.indexOf(element);
+    if (index !== -1) {
+      const parentSelector = parent.id
+        ? `#${CSS.escape(parent.id)}`
+        : parent.className
+          ? `.${CSS.escape(parent.className.split(' ')[0])}`
+          : parent.tagName.toLowerCase();
+      return `${parentSelector} > ${tagName}:nth-of-type(${index + 1})`;
+    }
+  }
+
+  // 5. Fallback: use class if available
+  if (element.className) {
+    const firstClass = element.className.split(' ')[0];
+    return `${tagName}.${CSS.escape(firstClass)}`;
+  }
+
+  return tagName;
+}
+
+/**
+ * Detect essay questions (textareas with unknown purpose that look like essay prompts)
+ */
+export function detectEssayQuestions(): EssayQuestion[] {
+  const fields = detectFormFields();
+  const essayQuestions: EssayQuestion[] = [];
+
+  const textareaFields = fields.filter(f =>
+    f.type === 'textarea' &&
+    f.purpose === 'unknown'
+  );
+
+  textareaFields.forEach((field, index) => {
+    const element = field.element as HTMLTextAreaElement;
+    const questionText = extractQuestionText(element);
+
+    // Skip very short "questions" that are likely just labels
+    if (questionText.length < 15) return;
+
+    // Skip if it looks like a cover letter field (handled separately)
+    if (/cover\s*letter/i.test(questionText)) return;
+
+    essayQuestions.push({
+      id: `essay_${index}`,
+      question: questionText,
+      fieldSelector: generateUniqueSelector(element),
+      maxLength: element.maxLength > 0 ? element.maxLength : undefined,
+      required: element.hasAttribute('required') || element.getAttribute('aria-required') === 'true',
+    });
+  });
+
+  return essayQuestions;
+}
+
+/**
+ * Fill a specific essay textarea using its selector
+ */
+export async function fillEssayField(selector: string, text: string): Promise<boolean> {
+  try {
+    const element = document.querySelector(selector) as HTMLTextAreaElement;
+    if (!element) {
+      console.error(`[CareerFlow] Essay field not found: ${selector}`);
+      return false;
+    }
+
+    // Create a temporary FormField for fillSingleField
+    const tempField: FormField = {
+      element,
+      type: 'textarea',
+      purpose: 'unknown',
+      label: 'Essay',
+      confidence: 100,
+    };
+
+    // Scroll into view
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await sleep(200);
+
+    // Fill the field
+    const success = await fillSingleField(tempField, text);
+
+    if (success) {
+      // Visual feedback
+      element.style.backgroundColor = '#22c55e33';
+      setTimeout(() => {
+        element.style.backgroundColor = '';
+      }, 1000);
+    }
+
+    return success;
+  } catch (error) {
+    console.error('[CareerFlow] Error filling essay field:', error);
+    return false;
+  }
+}
+
+/**
+ * Fill multiple essay fields from an array of responses
+ */
+export async function fillEssayFields(
+  responses: { questionId: string; response: string; selector: string }[]
+): Promise<{ filled: number; total: number }> {
+  let filled = 0;
+  const total = responses.length;
+
+  for (const { selector, response } of responses) {
+    const success = await fillEssayField(selector, response);
+    if (success) filled++;
+    await sleep(300); // Brief pause between fills
+  }
+
+  return { filled, total };
+}
+
+/**
+ * Fill cover letter field if present on the page
+ */
+export async function fillCoverLetter(coverLetterText: string): Promise<boolean> {
+  const fields = detectFormFields();
+
+  // Find cover letter textarea field
+  const coverLetterField = fields.find(f =>
+    f.purpose === 'cover_letter' && f.type === 'textarea'
+  );
+
+  if (!coverLetterField) {
+    // Also try to find any textarea that looks like a cover letter field
+    const textareas = fields.filter(f => f.type === 'textarea');
+    for (const field of textareas) {
+      const labelText = (field.label || '').toLowerCase();
+      if (labelText.includes('cover') || labelText.includes('letter')) {
+        return await fillCoverLetterField(field.element as HTMLTextAreaElement, coverLetterText);
+      }
+    }
+    console.log('[CareerFlow] No cover letter field found on page');
+    return false;
+  }
+
+  return await fillCoverLetterField(coverLetterField.element as HTMLTextAreaElement, coverLetterText);
+}
+
+async function fillCoverLetterField(element: HTMLTextAreaElement, text: string): Promise<boolean> {
+  try {
+    // Scroll into view
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await sleep(200);
+
+    // Focus the element
+    element.focus();
+    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+
+    // Clear existing value
+    element.value = '';
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+
+    // Set the value directly (cover letters are too long to type character by character)
+    element.value = text;
+
+    // Dispatch events
+    element.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: text,
+    }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Blur
+    element.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+    element.blur();
+
+    // Visual feedback
+    element.style.backgroundColor = '#22c55e33';
+    highlightElement(element, '✓ Cover letter filled!');
+    setTimeout(() => {
+      element.style.backgroundColor = '';
+    }, 2000);
+
+    console.log('[CareerFlow] Cover letter filled successfully');
+    return true;
+  } catch (error) {
+    console.error('[CareerFlow] Error filling cover letter:', error);
+    return false;
+  }
 }

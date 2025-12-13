@@ -29,9 +29,20 @@ const extractSchema = z.object({
   }).optional(),
 });
 
+import { deductCredits } from './credits.js';
+
+// ...
+
 // POST /api/scrape/extract - AI-powered job extraction fallback
 router.post('/extract', scrapeRateLimit, async (req: Request, res: Response) => {
   try {
+    const userId = req.userId;
+    // Deduct 5 credits for AI extraction
+    if (userId && !(await deductCredits(userId, 5))) {
+      res.status(403).json({ error: 'Insufficient credits (Cost: 5)' });
+      return;
+    }
+
     const validation = extractSchema.safeParse(req.body);
 
     if (!validation.success) {

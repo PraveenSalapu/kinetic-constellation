@@ -69,17 +69,22 @@ const PLATFORM_SELECTORS: Record<string, {
     title: [
       '.app-title',
       'h1.posting-headline',
+      'h1', // Generic H1 often works for modern boards
       '.job-title',
     ],
     company: [
       '.company-name',
       '.company',
       '[class*="company"]',
+      'span.company',
     ],
     description: [
       '#content .content',
+      '#content', // Sometimes just #content
+      '#main',
       '.job-description',
       '.content-intro',
+      '[class*="description"]',
     ],
     location: [
       '.location',
@@ -241,9 +246,9 @@ function collectFullJobDescription(): string {
           // Check if this section is relevant
           const lowerText = text.toLowerCase();
           const isRelevant = relevantKeywords.some(kw => lowerText.includes(kw)) ||
-                            (selector.includes('description') ||
-                             selector.includes('requirements') ||
-                             selector.includes('qualifications'));
+            (selector.includes('description') ||
+              selector.includes('requirements') ||
+              selector.includes('qualifications'));
 
           if (isRelevant && !sections.some(s => s.includes(text) || text.includes(s))) {
             sections.push(text);

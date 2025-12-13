@@ -7,7 +7,9 @@ import { AuthPage } from './components/Auth/AuthPage';
 import { HeroRoaster } from './components/Landing/HeroRoaster';
 import { ScanResults } from './components/Landing/ScanResults';
 import { DemographicsStep } from './components/Onboarding/DemographicsStep';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getOnboardingStatus, completeOnboarding } from './services/storage';
+import { Loader2 } from 'lucide-react';
 
 // Protected route wrapper
 // Protected route wrapper
@@ -32,19 +34,58 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Main app content after auth
 function AppContent() {
-  const [onboardingComplete, setOnboardingComplete] = useState(() => {
-    return localStorage.getItem('onboardingComplete') === 'true';
-  });
+  const { user, isLoading: authLoading } = useAuth();
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [view, setView] = useState<'roaster' | 'results' | 'demographics' | 'editor'>('roaster');
 
-  const handleFinalComplete = () => {
-    localStorage.setItem('onboardingComplete', 'true');
-    setOnboardingComplete(true);
+  // Check onboarding status from database when user changes
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      setOnboardingComplete(false);
+      return;
+    }
+
+    const checkOnboarding = async () => {
+      try {
+        const status = await getOnboardingStatus(user.id);
+        setOnboardingComplete(status);
+        if (!status) {
+          setView('roaster');
+        }
+      } catch (error) {
+        console.error('[App] Failed to check onboarding status:', error);
+        setOnboardingComplete(false);
+      }
+    };
+    checkOnboarding();
+  }, [user, authLoading]);
+
+  const handleFinalComplete = async () => {
+    try {
+      await completeOnboarding(user?.id);
+      setOnboardingComplete(true);
+    } catch (error) {
+      console.error('[App] Failed to complete onboarding:', error);
+      // Still allow user to proceed even if save fails
+      setOnboardingComplete(true);
+    }
   };
 
   const handleSkipToEditor = () => {
     handleFinalComplete();
   };
+
+  // Loading state while checking onboarding status
+  if (onboardingComplete === null) {
+    return (
+      <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center bg-[#0F0F0F] text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
+        <p className="text-gray-400 font-mono text-sm">Checking profile status...</p>
+      </div>
+    );
+  }
 
   if (onboardingComplete) {
     return <Layout />;

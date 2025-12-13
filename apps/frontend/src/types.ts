@@ -9,112 +9,145 @@ export interface Section {
 }
 
 export type SectionConfig = Section;
-export type SkillGroup = Resume['skills'][number];
-export type ExperienceItem = Resume['experience'][number];
-export type EducationItem = Resume['education'][number];
-export type ProjectItem = Resume['projects'][number];
-export type CertificationItem = Resume['certifications'][number];
 
+export interface PersonalInfo {
+    fullName: string;
+    email: string;
+    phone: string;
+    location: string;
+    website?: string;
+    linkedin?: string;
+    github?: string;
+    customFields?: { label: string; value: string }[];
+}
+
+export interface ExperienceItem {
+    id: string;
+    company: string;
+    position: string;
+    startDate: string;
+    endDate: string;
+    current: boolean;
+    description: string[];
+    location?: string;
+}
+
+export interface EducationItem {
+    id: string;
+    institution: string;
+    degree: string;
+    fieldOfStudy: string;
+    startDate: string;
+    endDate: string;
+    grade?: string;
+}
+
+export interface SkillGroup {
+    id: string;
+    category: string;
+    items: string[];
+}
+
+export interface ProjectItem {
+    id: string;
+    name: string;
+    description: string;
+    technologies: string[];
+    link?: string;
+    github?: string;
+    bullets?: string[];
+}
+
+export interface CertificationItem {
+    id: string;
+    name: string;
+    issuer: string;
+    date: string;
+    link?: string;
+}
+
+export interface LayoutSettings {
+    fontFamily?: string;
+    fontSize: number;
+    lineHeight: number;
+    sectionSpacing: number;
+    nameSize?: number;
+    contactSize?: number;
+    margin: {
+        top: number;
+        right: number;
+        bottom: number;
+        left: number;
+    };
+}
+
+export interface TailoringJob {
+    company: string;
+    title: string;
+    description: string;
+    link?: string;
+}
+
+// Demographics data for EEO and application logistics
 export interface Demographics {
+    // EEO Fields
     gender?: string;
+    pronouns?: string;
+    isHispanic?: string;
     race?: string;
+    isLGBTQ?: string;
+    sexualOrientation?: string;
     veteranStatus?: string;
     disabilityStatus?: string;
+    // Application Logistics
+    availability?: string;
+    salaryExpectation?: string;
+    relocation?: string;
+    // Authorization
     workAuthorization?: string;
     requiresSponsorship?: boolean;
 }
 
+// ATS Scan results
 export interface AtsScan {
     score: number;
-    issues: { type: 'error' | 'warning' | 'success'; message: string }[];
-    missingKeywords: string[];
+    issues: {
+        type: 'error' | 'warning' | 'info' | 'success';
+        message: string;
+        field?: string;
+    }[];
+    keywords?: string[];
+    suggestions?: string[];
+    missingKeywords?: string[];
 }
 
 export interface Resume {
     id: string;
     title: string;
     sections: Section[];
-    personalInfo: {
-        fullName: string;
-        email: string;
-        phone: string;
-        location: string;
-        website?: string;
-        linkedin?: string;
-        github?: string;
-        customFields?: { label: string; value: string }[];
-    };
+    personalInfo: PersonalInfo;
     summary: string;
-    experience: {
-        id: string;
-        company: string;
-        position: string;
-        startDate: string;
-        endDate: string;
-        current: boolean;
-        description: string[]; // Bullet points
-        location?: string;
-    }[];
-    education: {
-        id: string;
-        institution: string;
-        degree: string;
-        fieldOfStudy: string;
-        startDate: string;
-        endDate: string;
-        grade?: string;
-    }[];
-    skills: {
-        id: string;
-        category: string;
-        items: string[];
-    }[];
-    projects: {
-        id: string;
-        name: string;
-        description: string;
-        technologies: string[];
-        link?: string;
-        github?: string;
-        bullets?: string[];
-    }[];
-    certifications: {
-        id: string;
-        name: string;
-        issuer: string;
-        date: string;
-        link?: string;
-    }[];
+    experience: ExperienceItem[];
+    education: EducationItem[];
+    skills: SkillGroup[];
+    projects: ProjectItem[];
+    certifications: CertificationItem[];
     selectedTemplate?: 'modern' | 'classic' | 'minimalist';
     selectedFont?: 'professional' | 'modern' | 'technical';
     pageSize?: 'A4' | 'LETTER';
-    layout?: {
-        fontFamily?: string; // Font family name
-        fontSize: number; // pt
-        lineHeight: number; // unitless multiplier
-        sectionSpacing: number; // mm
-        nameSize?: number; // pt (font size for name header)
-        contactSize?: number; // pt (font size for contact info)
-        margin: {
-            top: number; // mm
-            right: number; // mm
-            bottom: number; // mm
-            left: number; // mm
-        };
-    };
-
+    layout?: LayoutSettings;
     // Tailoring State
     isTailoring?: boolean;
-    tailoringJob?: {
-        company: string;
-        title: string;
-        description: string;
-        link?: string;
-    };
+    tailoringJob?: TailoringJob;
     originalResume?: Resume;
+    // Generated cover letter for autofill
+    generatedCoverLetter?: string;
+    // User data
     demographics?: Demographics;
     atsScan?: AtsScan;
 }
+
+export type SkillGroupType = SkillGroup;
 
 export interface UserProfile {
     id: string;
@@ -136,8 +169,12 @@ export interface TailorResponse {
             new: string;
             reason: string;
         }[];
-        recommendedBullets: {
+        suggestedAdditions: {
             bullet: string;
+            reason: string;
+        }[];
+        bulletsToDrop: {
+            original: string;
             reason: string;
         }[];
     }[];
@@ -175,9 +212,22 @@ export interface Job {
     title: string;
     link: string;
     match_score: number;
+    // Application Logistics
+    availability?: string;
+    salaryExpectation?: string;
+    relocation?: string;
+    pronouns?: string;
+    // Detailed EEO (Reference)
+    isLGBTQ?: string;
+    sexualOrientation?: string;
+    isHispanic?: string;
     missing_skills: string[];
     summary: string;
     description?: string;
     location?: string;
     created_at?: string;
+    // Job metadata
+    experienceLevel?: string;
+    jobType?: string;
+    category?: string;
 }

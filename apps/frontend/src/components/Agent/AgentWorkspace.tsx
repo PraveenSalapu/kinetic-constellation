@@ -159,7 +159,27 @@ export function AgentWorkspace({ resumeContext, onResult }: AgentWorkspaceProps)
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#111] rounded-lg shadow-lg border border-gray-800">
+    <div className="relative flex flex-col h-full bg-[#111] rounded-lg shadow-lg border border-gray-800">
+      {/* Coming Soon Overlay */}
+      <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg">
+        <div className="text-center p-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-purple-900/30 border border-purple-500/30 flex items-center justify-center">
+            <Sparkles className="w-10 h-10 text-purple-400" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-3">AI Agents Coming Soon</h3>
+          <p className="text-gray-400 max-w-md mx-auto mb-6">
+            We're building intelligent AI agents that will help you optimize your resume,
+            prepare for interviews, and navigate your job search with personalized guidance.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
+            <span className="px-3 py-1 bg-purple-900/20 border border-purple-800/30 rounded-full text-purple-300 text-sm">Career Coach</span>
+            <span className="px-3 py-1 bg-green-900/20 border border-green-800/30 rounded-full text-green-300 text-sm">Resume Optimizer</span>
+            <span className="px-3 py-1 bg-blue-900/20 border border-blue-800/30 rounded-full text-blue-300 text-sm">Interview Prep</span>
+          </div>
+          <p className="text-sm text-gray-500">Stay tuned for updates!</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center gap-2">

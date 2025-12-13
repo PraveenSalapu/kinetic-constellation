@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { supabase } from '../services/supabase';
-import { syncProfilesFromApi } from '../services/storage';
+import { getCredits } from '../services/api';
+import { clearCache } from '../services/storage';
+import { useToast } from './ToastContext';
 
 interface User {
   id: string;
@@ -14,35 +16,77 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  credits: number | null;
+  refreshCredits: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { addToast } = useToast();
+  const previousUserId = useRef<string | null>(null);
 
   // Check for existing session on mount
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const newUser = session?.user ?? null;
+      setUser(newUser);
       setIsLoading(false);
-      if (session?.user) {
-        syncProfilesFromApi().catch(console.error);
+      if (newUser) {
+        previousUserId.current = newUser.id;
       }
     });
 
-    // Listen for changes
+    // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const newUser = session?.user ?? null;
+
+      // Clear cache on user switch to prevent data leaks
+      if (newUser && previousUserId.current && newUser.id !== previousUserId.current) {
+        console.log('[Auth] User switched from', previousUserId.current, 'to', newUser.id);
+        clearCache(); // Clear previous user's cached data
+      }
+
+      if (event === 'SIGNED_IN' && newUser) {
+        console.log('[Auth] User signed in:', newUser.email);
+        // Clear any stale cache from previous sessions
+        if (!previousUserId.current) {
+          clearCache();
+        }
+      }
+
+      setUser(newUser);
+      previousUserId.current = newUser?.id ?? null;
       setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const refreshCredits = async () => {
+    if (user) {
+      try {
+        const balance = await getCredits();
+        setCredits(balance);
+      } catch (e) {
+        console.error('Failed to refresh credits:', e);
+        // Only show toast if it's a persistent error to avoid spam, 
+        // but for debugging this installation issue, it's helpful.
+        addToast('error', 'Could not load credits. Did you run the SQL migration?');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (user) refreshCredits();
+    else setCredits(null);
+  }, [user]);
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -57,7 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    // Clear cached profile data to prevent leaks
+    // This clears ALL local storage caches (Guest and User)
+    clearCache();
     setUser(null);
+    setCredits(null);
   };
 
   return (
@@ -69,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        credits,
+        refreshCredits,
       }}
     >
       {children}

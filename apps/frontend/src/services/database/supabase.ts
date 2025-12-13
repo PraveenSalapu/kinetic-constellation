@@ -48,7 +48,7 @@ export const fetchJobsFromDB = async (): Promise<Job[]> => {
     // Unauthenticated or API failed: direct Supabase query
     const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, company, link, description, location, created_at, match_score, missing_skills')
+        .select('id, title, company, link, description, location, created_at, match_score, missing_skills, experience_level, job_type, category')
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -66,6 +66,9 @@ export const fetchJobsFromDB = async (): Promise<Job[]> => {
         match_score: Number(record.match_score) || 0,
         missing_skills: record.missing_skills || [],
         location: record.location,
-        created_at: record.created_at
+        created_at: record.created_at,
+        experienceLevel: record.experience_level,
+        jobType: record.job_type,
+        category: record.category
     })) as Job[];
 };

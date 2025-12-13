@@ -26,8 +26,12 @@ export interface TailorResponse {
       new: string;
       reason: string;
     }[];
-    recommendedBullets: {
+    suggestedAdditions: {
       bullet: string;
+      reason: string;
+    }[];
+    bulletsToDrop: {
+      original: string;
       reason: string;
     }[];
   }[];

@@ -1,8 +1,9 @@
 
 // API Service for backend communication
 import { supabase } from './supabase';
+import config from '../config/environment';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = config.apiUrl;
 
 // Make authenticated API request
 export async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
@@ -47,7 +48,7 @@ export async function createProfile(name: string, resumeData: any): Promise<any>
   return data.profile;
 }
 
-export async function updateProfile(id: string, updates: { name?: string; data?: any; isActive?: boolean }): Promise<any> {
+export async function updateProfile(id: string, updates: { name?: string; data?: any; isActive?: boolean; hasCompletedOnboarding?: boolean }): Promise<any> {
   const response = await fetchWithAuth(`/api/profiles/${id}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
@@ -140,4 +141,12 @@ export async function getVectorMatchScore(resumeText: string, jobDescription: st
   if (!response.ok) throw new Error(data.error || 'Failed to calculate vector score');
 
   return data.score;
+}
+
+// Credits API
+export async function getCredits(): Promise<number> {
+  const response = await fetchWithAuth('/api/credits/balance');
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Failed to fetch credits');
+  return data.credits;
 }

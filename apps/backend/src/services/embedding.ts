@@ -162,51 +162,64 @@ function formatResumeForEmbedding(resume: Resume): string {
 
   // Title/Role (Derived from first experience or summary)
   // PersonalInfo doesn't have a title field in the schema
-  if (resume.experience?.length > 0) {
+  if (resume.experience?.length > 0 && resume.experience[0].position) {
     parts.push(`Current Role: ${resume.experience[0].position}`);
   }
 
   // Summary (high signal)
-  if (resume.summary) {
+  if (resume.summary && resume.summary.trim()) {
     parts.push(`Professional Summary: ${resume.summary}`);
   }
 
   // Skills (critical for matching)
   if (resume.skills?.length) {
-    const allSkills = resume.skills.flatMap(group => group.items);
-    parts.push(`Skills: ${allSkills.join(', ')}`);
+    const allSkills = resume.skills.flatMap(group => group.items || []).filter(Boolean);
+    if (allSkills.length > 0) {
+      parts.push(`Skills: ${allSkills.join(', ')}`);
+    }
   }
 
   // Experience (titles and key responsibilities)
   if (resume.experience?.length) {
-    parts.push('Experience:');
-    for (const exp of resume.experience) {
-      parts.push(`${exp.position} at ${exp.company}`);
-      if (exp.description?.length) {
-        // Include first 3 bullets for each experience
-        const bullets = exp.description.slice(0, 3).join('. ');
-        parts.push(bullets);
+    const validExperiences = resume.experience.filter(exp => exp.position || exp.company);
+    if (validExperiences.length > 0) {
+      parts.push('Experience:');
+      for (const exp of validExperiences) {
+        if (exp.position || exp.company) {
+          parts.push(`${exp.position || 'Role'} at ${exp.company || 'Company'}`);
+        }
+        if (exp.description?.length) {
+          // Include first 3 bullets for each experience
+          const bullets = exp.description.slice(0, 3).filter(Boolean).join('. ');
+          if (bullets) parts.push(bullets);
+        }
       }
     }
   }
 
   // Education (degree and field)
   if (resume.education?.length) {
-    const eduSummary = resume.education
-      .map(edu => `${edu.degree} in ${edu.fieldOfStudy}`)
-      .join(', ');
-    parts.push(`Education: ${eduSummary}`);
+    const validEducation = resume.education.filter(edu => edu.degree || edu.fieldOfStudy);
+    if (validEducation.length > 0) {
+      const eduSummary = validEducation
+        .map(edu => `${edu.degree || 'Degree'} in ${edu.fieldOfStudy || 'Field'}`)
+        .join(', ');
+      parts.push(`Education: ${eduSummary}`);
+    }
   }
 
   // Certifications
   if (resume.certifications?.length) {
-    const certNames = resume.certifications.map(c => c.name).join(', ');
-    parts.push(`Certifications: ${certNames}`);
+    const validCerts = resume.certifications.filter(c => c.name);
+    if (validCerts.length > 0) {
+      const certNames = validCerts.map(c => c.name).join(', ');
+      parts.push(`Certifications: ${certNames}`);
+    }
   }
 
   // Projects (technologies used)
   if (resume.projects?.length) {
-    const projectTech = resume.projects.flatMap(p => p.technologies);
+    const projectTech = resume.projects.flatMap(p => p.technologies || []).filter(Boolean);
     const uniqueTech = [...new Set(projectTech)];
     if (uniqueTech.length > 0) {
       parts.push(`Project Technologies: ${uniqueTech.join(', ')}`);
@@ -214,4 +227,13 @@ function formatResumeForEmbedding(resume: Resume): string {
   }
 
   return parts.join('\n');
+}
+
+/**
+ * Check if resume has enough content to generate a meaningful embedding
+ */
+export function hasEnoughContentForEmbedding(resume: Resume): boolean {
+  const text = formatResumeForEmbedding(resume);
+  // Need at least 50 characters of meaningful content
+  return text.trim().length >= 50;
 }
