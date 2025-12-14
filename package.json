@@ -15,7 +15,8 @@
     "build:extension": "pnpm --filter @careerflow/extension build",
     "lint": "pnpm -r lint",
     "preview": "pnpm --filter @careerflow/frontend preview",
-    "clean": "pnpm -r exec rm -rf node_modules dist"
+    "clean": "pnpm -r exec rm -rf node_modules dist",
+    "heroku-postbuild": "pnpm install && pnpm build:shared && pnpm build:backend"
   },
   "devDependencies": {
     "tsx": "^4.21.0",
