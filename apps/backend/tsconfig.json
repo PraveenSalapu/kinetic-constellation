@@ -11,7 +11,15 @@
     "target": "ES2022",
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@careerflow/shared": [
+        "../../packages/shared/dist/index.d.ts"
+      ],
+      "@careerflow/shared/*": [
+        "../../packages/shared/dist/*"
+      ]
+    }
   },
   "include": [
     "src/**/*"
