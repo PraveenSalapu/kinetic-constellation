@@ -230,4 +230,5 @@ export interface Job {
     experienceLevel?: string;
     jobType?: string;
     category?: string;
+    salary?: string;
 }
