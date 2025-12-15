@@ -1,5 +1,5 @@
 {
-  "name": "@careerflow/backend",
+  "name": "@resumind/backend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@careerflow/shared": "workspace:*",
+    "@resumind/shared": "workspace:*",
     "@google/genai": "^1.30.0",
     "@supabase/supabase-js": "^2.86.2",
     "@types/pdfkit": "^0.17.4",

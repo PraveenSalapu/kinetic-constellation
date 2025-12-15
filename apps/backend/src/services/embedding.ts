@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import type { Resume } from '@careerflow/shared';
+import type { Resume } from '@resumind/shared';
 
 const API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 

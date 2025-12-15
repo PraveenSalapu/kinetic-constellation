@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { generateResumeEmbedding, cosineSimilarity, similarityToScore, hasEnoughContentForEmbedding } from './embedding.js';
-import type { Resume } from '@careerflow/shared';
+import type { Resume } from '@resumind/shared';
 
 // Lazy-initialized Supabase client
 let _supabase: SupabaseClient | null = null;

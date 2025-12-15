@@ -16,10 +16,10 @@
     "noImplicitAny": false,
     "skipLibCheck": true,
     "paths": {
-      "@careerflow/shared": [
+      "@resumind/shared": [
         "../../packages/shared/dist/index.d.ts"
       ],
-      "@careerflow/shared/*": [
+      "@resumind/shared/*": [
         "../../packages/shared/dist/*"
       ]
     }

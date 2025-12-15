@@ -27,10 +27,10 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@careerflow/shared": [
+      "@resumind/shared": [
         "../../packages/shared/src"
       ],
-      "@careerflow/shared/*": [
+      "@resumind/shared/*": [
         "../../packages/shared/src/*"
       ]
     }

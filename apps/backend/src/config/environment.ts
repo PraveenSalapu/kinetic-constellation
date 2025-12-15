@@ -18,36 +18,36 @@ export const config = {
   enableDebugLogs: isDevelopment,
 };
 
-function getCorsOrigins(): (string | RegExp)[] {
-  const origins: (string | RegExp)[] = [
-    /^chrome-extension:\/\/.*/, // Chrome extension always allowed
-  ];
+const origins: (string | RegExp)[] = [
+  /^chrome-extension:\/\/.*/, // Chrome extension always allowed
+  /\.vercel\.app$/,            // Allow all Vercel preview/production URLs
+];
 
-  if (isDevelopment) {
-    // Development origins
-    origins.push(
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'http://localhost:4173',
-    );
-  }
+if (isDevelopment) {
+  // Development origins
+  origins.push(
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://localhost:4173',
+  );
+}
 
-  // Production origins from environment
-  const productionOrigins = process.env.CORS_ORIGINS;
-  if (productionOrigins) {
-    productionOrigins.split(',').forEach(origin => {
-      origins.push(origin.trim());
-    });
-  }
+// Production origins from environment
+const productionOrigins = process.env.CORS_ORIGINS;
+if (productionOrigins) {
+  productionOrigins.split(',').forEach(origin => {
+    origins.push(origin.trim());
+  });
+}
 
-  // Always include the app URL if set
-  const appUrl = process.env.APP_URL;
-  if (appUrl && !origins.includes(appUrl)) {
-    origins.push(appUrl);
-  }
+// Always include the app URL if set
+const appUrl = process.env.APP_URL;
+if (appUrl && !origins.includes(appUrl)) {
+  origins.push(appUrl);
+}
 
-  return origins;
+return origins;
 }
 
 // Validate required environment variables at startup

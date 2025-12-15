@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import type { Schema } from '@google/genai';
-import type { TailorResponse, MatchScoreResponse, Resume, EssayQuestion, EssayResponse } from '@careerflow/shared';
-import { formatResumeForToon, SYSTEM_INSTRUCTIONS, PROMPT_TEMPLATES } from '@careerflow/shared';
+import type { TailorResponse, MatchScoreResponse, Resume, EssayQuestion, EssayResponse } from '@resumind/shared';
+import { formatResumeForToon, SYSTEM_INSTRUCTIONS, PROMPT_TEMPLATES } from '@resumind/shared';
 
 const API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
@@ -337,7 +337,7 @@ export const calculateATSScore = async (resume: Resume, jobDescription: string):
   }
 };
 
-// Note: formatResumeForAI replaced by formatResumeForToon from @careerflow/shared
+// Note: formatResumeForAI replaced by formatResumeForToon from @resumind/shared
 // TOON format achieves ~40-60% token savings on structured resume data
 
 /**

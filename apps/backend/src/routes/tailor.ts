@@ -4,7 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authenticateToken } from '../middleware/auth.js';
 import { tailorResume, calculateATSScore, optimizeBulletPoint, generateEssayResponses, generateCoverLetter, standardizeSkills } from '../services/gemini.js';
 import { deductCredits } from './credits.js';
-import type { Resume, EssayQuestion } from '@careerflow/shared';
+import type { Resume, EssayQuestion } from '@resumind/shared';
 
 const router: Router = Router();
 

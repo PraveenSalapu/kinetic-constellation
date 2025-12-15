@@ -39,7 +39,8 @@
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
       "Bash(pnpm build:backend:*)",
-      "Bash(pnpm dev:backend:*)"
+      "Bash(pnpm dev:backend:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
